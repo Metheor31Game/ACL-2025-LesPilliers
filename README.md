@@ -11,3 +11,5 @@ npm install
 npm run build:css
 
 npm start
+
+localhost:3000
