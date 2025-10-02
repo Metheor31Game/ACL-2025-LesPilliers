@@ -1,0 +1,32 @@
+{
+  "name": "acl-2025-lespilliers",
+  "version": "1.0.0",
+  "description": "Projet Agenda ACL 2025, équipe Les Pilliers",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "build:css": "tailwindcss -i ./src/styles/input.css -o ./public/output.css --minify",
+    "dev:css": "tailwindcss -i ./src/styles/input.css -o ./public/output.css --watch",
+    "start": "node src/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Metheor31Game/ACL-2025-LesPilliers.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Metheor31Game/ACL-2025-LesPilliers/issues"
+  },
+  "homepage": "https://github.com/Metheor31Game/ACL-2025-LesPilliers#readme",
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.14",
+    "autoprefixer": "^10.4.21",
+    "nodemon": "^3.1.10",
+    "postcss": "^8.5.6"
+  }
+}
