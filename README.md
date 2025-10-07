@@ -1,5 +1,7 @@
 # ACL-2025-LesPilliers
 
+Lien du Discord d'organisation : https://discord.gg/GsaSSkyp
+
 Projet Agenda ACL 2025, équipe Les Pilliers
 
 Pour build :
@@ -13,3 +15,5 @@ npm run build:css
 npm start
 
 localhost:3000
+
+
