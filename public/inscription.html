@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Inscription - AgendaApp</title>
+  <link rel="icon" href="/favicon.ico" />
+
+</head>
+<body>
+  <h2>Créer un compte</h2>
+  <form id="registerForm">
+    <input type="text" id="username" placeholder="Identifiant" required />
+    <input type="password" id="password" placeholder="Mot de passe" required />
+    <button type="submit">S'inscrire</button>
+  </form>
+
+  <script>
+    document.getElementById('registerForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        alert('Erreur : ' + text);
+        return;
+      }
+
+      const data = await res.json();
+      alert(data.message);
+      window.location.href = 'connexion.html';
+    });
+  </script>
+</body>
+</html>

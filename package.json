@@ -21,7 +21,11 @@
   },
   "homepage": "https://github.com/Metheor31Game/ACL-2025-LesPilliers#readme",
   "dependencies": {
-    "express": "^5.1.0"
+    "bcrypt": "^6.0.0",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.1"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.14",
