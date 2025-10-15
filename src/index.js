@@ -4,6 +4,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const authRoutes = require('./route/authroute');
 const testRoutes = require('./route/testroute');
+const session = require('express-session');
 
 const app = express();
 const PORT = 3000;
@@ -15,6 +16,13 @@ app.use(express.static('public'));
 mongoose.connect('mongodb://localhost:27017/agendaApp')
   .then(() => console.log('Connecté à MongoDB'))
   .catch(err => console.error(' Erreur MongoDB :', err));
+
+app.use(session({
+  secret: 'ton_secret', // à personnaliser
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // mettre true si HTTPS
+}));
 
 app.use('/api/auth', authRoutes);
 app.use('/api', testRoutes);
