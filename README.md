@@ -10,10 +10,11 @@ se placer dans la racine
 
 npm install
 
+lancer la base de donnée mongodb (généralement avec "mongod" )
+(vérifier que cela marche bien avec mongosh)
+
 npm run build:css
 
-npm start
+npm run start
 
 localhost:3000
-
-
