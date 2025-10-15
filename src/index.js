@@ -19,6 +19,7 @@ mongoose
   .then(() => console.log("Connecté à MongoDB"))
   .catch((err) => console.error(" Erreur MongoDB :", err));
 
+//Gestion de la connection avec session + cookie
 app.use(
   session({
     secret: "ton_secret", // à personnaliser
