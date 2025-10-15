@@ -2,6 +2,17 @@ const express = require("express");
 const router = express.Router();
 const User = require("../model/personne");
 
+// Route de déconnexion
+router.post("/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err)
+      return res
+        .status(500)
+        .json({ message: "Erreur lors de la déconnexion." });
+    res.json({ message: "Déconnecté." });
+  });
+});
+
 //route inscription
 router.post("/register", async (req, res) => {
   const { username, password } = req.body;
