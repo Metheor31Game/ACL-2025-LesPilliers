@@ -52,6 +52,7 @@
       fetch("/api/agenda")
         .then((res) => {
           if (res.status === 401) {
+            alert("Vous n'êtes pas connecté");
             window.location.href = "connexion.html";
             return;
           }
