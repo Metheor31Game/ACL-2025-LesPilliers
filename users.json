@@ -1,8 +1,0 @@
-[
-  {
-    "id": 1,
-    "email": "test@example.com",
-    "passwordHash": "$2b$10$0Xjqj1qT8s7x4qRCd2D2qOS3MtyaKK3jSR8m9oE8LveOKzOfL5Z/2"
-  }
-]
-/* Le mot de passe ici est "1234" (déjà hashé avec bcrypt).*/
