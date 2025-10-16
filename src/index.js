@@ -12,7 +12,7 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static("public"));
+app.use(express.static("../public")); //par rapport a package.json
 
 mongoose
   .connect("mongodb://localhost:27017/agendaApp")
