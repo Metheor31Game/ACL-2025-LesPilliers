@@ -6,7 +6,7 @@ Projet Agenda ACL 2025, équipe Les Pilliers
 
 Pour build :
 
-se placer dans la racine
+se placer dans src
 
 npm install
 
