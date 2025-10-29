@@ -4,10 +4,10 @@
   "description": "Projet Agenda ACL 2025, équipe Les Pilliers",
   "main": "index.js",
   "scripts": {
-    "dev": "nodemon src/index.js",
-    "build:css": "tailwindcss -i ./src/styles/input.css -o ./public/output.css --minify",
-    "dev:css": "tailwindcss -i ./src/styles/input.css -o ./public/output.css --watch",
-    "start": "node src/index.js"
+    "dev": "nodemon index.js",
+    "build:css": "tailwindcss -i ./styles/input.css -o ../public/output.css --minify",
+    "dev:css": "tailwindcss -i ./styles/input.css -o ./public/output.css --watch",
+    "start": "node index.js"
   },
   "repository": {
     "type": "git",

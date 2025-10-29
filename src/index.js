@@ -6,13 +6,15 @@ const authRoutes = require("./route/authroute");
 const testRoutes = require("./route/testroute");
 const agendaRoutes = require("./route/agendaroute");
 const session = require("express-session");
+const path = require("path"); // Pour gérer les chemins de fichiers
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static("../public")); //par rapport a package.json
+/*Cette version utilise un chemin absolu : peu importe d’où tu lances le serveur, Express trouvera correctement public/*/
+app.use(express.static(path.join(__dirname, "../public"))); 
 
 mongoose
   .connect("mongodb://localhost:27017/agendaApp")
