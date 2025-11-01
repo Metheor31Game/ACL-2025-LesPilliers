@@ -6,13 +6,14 @@ const authRoutes = require("./route/authroute");
 const testRoutes = require("./route/testroute");
 const agendaRoutes = require("./route/agendaroute");
 const session = require("express-session");
+const path = require("path");
 
 const app = express();
 const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static("../public")); //par rapport a package.json
+app.use(express.static(path.join(__dirname, "../public"))); //par rapport a package.json
 
 mongoose
   .connect("mongodb://localhost:27017/agendaApp")
@@ -30,8 +31,9 @@ app.use(
 );
 
 app.use("/api/auth", authRoutes);
-app.use("/api", testRoutes);
-app.use("/api", agendaRoutes);
+app.use("/api/agenda", agendaRoutes);
+app.use("/api/test", testRoutes);
+
 
 app.listen(PORT, () =>
   console.log(`🚀 Serveur en ligne : http://localhost:${PORT}`)

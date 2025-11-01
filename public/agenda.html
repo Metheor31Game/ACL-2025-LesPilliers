@@ -20,6 +20,12 @@
       >
         Déconnexion
       </button>
+      <button
+        id="accSettingsBtn"
+        class="w-full mb-4 py-2 px-4 bg-red-500 text-white rounded hover:bg-red-600 transition"
+      >
+        Paramètres de compte
+      </button>
       <ul class="space-y-3">
         <li
           class="flex items-center justify-between bg-gray-100 rounded px-3 py-2"
@@ -65,16 +71,28 @@
           }
         });
       // Déconnexion
-      document
-        .getElementById("logoutBtn")
-        .addEventListener("click", async () => {
-          const res = await fetch("/api/auth/logout", { method: "POST" });
-          if (res.ok) {
-            window.location.href = "connexion.html";
-          } else {
-            alert("Erreur lors de la déconnexion");
+      document.getElementById("logoutBtn").addEventListener("click", async () => {
+          try {
+              const res = await fetch("/api/auth/logout", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" }
+              });
+
+              if (res.ok) {
+                  alert("Déconnexion réussie !");
+                  window.location.href = "connexion.html";
+              } else {
+                  const error = await res.json();
+                  alert("Erreur : " + (error.message || "Déconnexion échouée"));
+              }
+          } catch (err) {
+              alert("Erreur réseau lors de la déconnexion");
           }
-        });
+      });
+      // accSettings
+      document.getElementById("accSettingsBtn").addEventListener("click", () => {
+          window.location.href = "accSettings.html";
+      });
     </script>
   </body>
 </html>

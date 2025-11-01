@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Paramètres du compte</title>
+    <link href="output.css" rel="stylesheet" />
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-6">
+<div class="w-full max-w-md bg-white rounded-lg shadow-md p-6">
+    <h1 class="text-2xl font-bold mb-6 text-center">Paramètres du compte</h1>
+
+    <form id="updateForm" class="space-y-4">
+        <div>
+            <label for="username" class="block text-sm font-medium text-gray-700">Nom d'utilisateur</label>
+            <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Laisser vide pour ne pas changer"
+            />
+        </div>
+
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">Nouveau mot de passe</label>
+            <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Laisser vide pour ne pas changer"
+            />
+        </div>
+
+        <button
+                type="submit"
+                class="w-full py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+        >
+            Mettre à jour
+        </button>
+    </form>
+
+    <button
+            id="backBtn"
+            class="w-full mt-4 py-2 px-4 bg-gray-500 text-white rounded hover:bg-gray-600 transition"
+    >
+        Retour à l'agenda
+    </button>
+
+    <p id="message" class="mt-4 text-center text-sm"></p>
+</div>
+
+<script>
+    document.getElementById("backBtn").addEventListener("click", () => {
+        window.location.href = "agenda.html";
+    });
+
+    fetch("/api/agenda")
+        .then((res) => {
+            if (res.status === 401) {
+                alert("Session expirée");
+                window.location.href = "connexion.html";
+            }
+        });
+
+    document.getElementById("updateForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (!username && !password) {
+            showMessage("Veuillez remplir au moins un champ.", "text-red-500");
+            return;
+        }
+
+        try {
+            const res = await fetch("/api/auth/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ username: username || undefined, password: password || undefined }),
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                showMessage(data.message, "text-green-500");
+                e.target.reset();
+            } else {
+                showMessage(data.message, "text-red-500");
+            }
+        } catch (err) {
+            showMessage("Erreur réseau.", "text-red-500");
+        }
+    });
+
+    function showMessage(text, color) {
+        const msg = document.getElementById("message");
+        msg.textContent = text;
+        msg.className = `mt-4 text-center text-sm font-medium ${color}`;
+    }
+</script>
+</body>
+</html>

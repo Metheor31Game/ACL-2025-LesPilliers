@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
+const path = require('path');
 const User = require("../model/personne");
+const isAuthenticated = require("../middleware/auth");
 
 // Route de déconnexion
 router.post("/logout", (req, res) => {
@@ -59,6 +61,39 @@ router.post("/login", async (req, res) => {
     console.error("Erreur lors de la connexion :", err);
     res.status(500).json({ message: "Erreur serveur lors de la connexion." });
   }
+});
+
+// Update d un compte
+router.post("/update", isAuthenticated, async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const user = await User.findById(req.session.userId);
+        if (!user) {
+            return res.status(404).json({ message: "Utilisateur non trouvé." });
+        }
+
+        // changement d username
+        if (username && username !== user.username) {
+            const existing = await User.findOne({ username });
+            if (existing) {
+                return res.status(400).json({ message: "Ce nom d'utilisateur existe déjà." });
+            }
+            user.username = username;
+        }
+
+        // changement de mdp
+        if (password) {
+            user.password = password;
+        }
+
+        await user.save();
+
+        res.json({ message: "Compte mis à jour avec succès !" });
+    } catch (err) {
+        console.error("Erreur mise à jour :", err);
+        res.status(500).json({ message: "Erreur serveur." });
+    }
 });
 
 module.exports = router;
