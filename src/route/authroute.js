@@ -18,20 +18,24 @@ router.post("/register", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Vérif si la personne existe
     const existing = await User.findOne({ username });
-    if (existing) {
+    if (existing)
       return res.status(400).json({ message: "Cet identifiant existe déjà." });
-    }
 
-    // Crée un nouvel utilisateur
     const user = new User({ username, password });
     await user.save();
 
-    res.status(201).json({ message: " Inscription réussie !" });
+    const agenda = new Agenda({
+      nom: "Mon premier agenda",
+      rdvs: [],
+      userId: user._id,
+    });
+    await agenda.save();
+
+    res.status(201).json({ message: "Inscription réussie !" });
   } catch (err) {
-    console.error("Erreur lors de l’inscription :", err);
-    res.status(500).json({ message: "Erreur serveur lors de l’inscription." });
+    console.error("Erreur d’inscription :", err);
+    res.status(500).json({ message: "Erreur serveur." });
   }
 });
 
