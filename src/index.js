@@ -33,7 +33,7 @@ app.use(
 
 app.use("/api/auth", authRoutes);
 app.use("/api", testRoutes);
-app.use("/api", agendaRoutes);
+app.use("/api/agenda", agendaRoutes);
 
 app.listen(PORT, () =>
   console.log(`🚀 Serveur en ligne : http://localhost:${PORT}`)

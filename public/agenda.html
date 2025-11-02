@@ -171,11 +171,13 @@
         if (!titre) return alert("Titre requis");
         if (!agendaDefaut) return alert("Aucun agenda trouvé !");
     
-        const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv`, {
+        const res = await fetch(`/api/agenda/${agendaId}/rdv`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ titre, description, date: selectedDate }),
+          credentials: "include",
+          body: JSON.stringify({ titre, date }),
         });
+
     
         if (!res.ok) {
           const err = await res.text();
@@ -199,10 +201,13 @@
       };
     
       document.getElementById("logoutBtn").onclick = async () => {
-        await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
         window.location.href = "connexion.html";
       };
-    
+      
       chargerAgendas();
     </script>
     
