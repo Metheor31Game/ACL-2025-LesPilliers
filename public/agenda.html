@@ -2,101 +2,209 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <title>Mon Agenda</title>
+    <title>Agenda - Vue hebdomadaire</title>
     <link rel="stylesheet" href="/output.css" />
+    <style>
+      .week-grid {
+        display: grid;
+        grid-template-columns: 80px repeat(7, 1fr);
+        border: 1px solid #ddd;
+      }
+      .week-header {
+        display: contents;
+      }
+      .week-header div {
+        background: #f3f4f6;
+        text-align: center;
+        font-weight: 600;
+        padding: 6px;
+        border-bottom: 1px solid #ddd;
+      }
+      .hour-cell {
+        border-top: 1px solid #eee;
+        text-align: center;
+        padding: 4px;
+        font-size: 0.85rem;
+        color: #555;
+      }
+      .day-cell {
+        border: 1px solid #eee;
+        height: 60px;
+        position: relative;
+        cursor: pointer;
+      }
+      .rdv {
+        position: absolute;
+        inset: 4px;
+        background: #3b82f6;
+        color: white;
+        font-size: 0.8rem;
+        border-radius: 6px;
+        padding: 2px 4px;
+        overflow: hidden;
+      }
+    </style>
+    
   </head>
-  <body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
-    <div class="max-w-2xl w-full bg-white rounded-lg shadow p-6">
-      <h1 class="text-2xl font-bold mb-4 text-center">Mes Agendas</h1>
+  <body class="bg-gray-50 min-h-screen p-6">
+    <div class="max-w-5xl mx-auto bg-white p-6 rounded shadow">
+      <h1 class="text-2xl font-bold mb-4 text-center">Mon Agenda - Vue Hebdomadaire</h1>
 
-      <div class="flex mb-4">
-        <input id="agendaNom" placeholder="Nom de l’agenda" class="border p-2 flex-1 rounded-l" />
-        <button id="btnAddAgenda" class="bg-blue-500 text-white px-4 rounded-r">Ajouter</button>
+      <div class="flex justify-between mb-4">
+        <button id="prevWeek" class="bg-gray-300 px-3 py-1 rounded">← Semaine précédente</button>
+        <span id="weekLabel" class="font-semibold text-lg"></span>
+        <button id="nextWeek" class="bg-gray-300 px-3 py-1 rounded">Semaine suivante →</button>
       </div>
 
-      <div id="agendas"></div>
+      <div id="agendaContainer" class="grid-container mb-6"></div>
 
-      <button id="logoutBtn" class="mt-6 bg-red-500 text-white px-4 py-2 rounded">
+      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded">
         Déconnexion
       </button>
     </div>
 
+    <!-- Modal ajout RDV -->
+    <div id="modal" class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden">
+      <div class="bg-white p-4 rounded shadow w-80">
+        <h2 class="text-lg font-bold mb-2">Nouveau RDV</h2>
+        <input id="titre" placeholder="Titre" class="border p-2 w-full mb-2 rounded" />
+        <textarea id="desc" placeholder="Description" class="border p-2 w-full mb-2 rounded"></textarea>
+        <button id="saveRdv" class="bg-green-500 text-white px-4 py-1 rounded">Enregistrer</button>
+        <button id="closeModal" class="ml-2 px-4 py-1 bg-gray-300 rounded">Annuler</button>
+      </div>
+    </div>
+
     <script>
+      let agendas = [];
+      let agendaDefaut = null;
+      let selectedDate = null;
+      let currentWeekStart = getMonday(new Date());
+    
       async function chargerAgendas() {
-        const res = await fetch("/api/agenda");
-        if (res.status === 401) {
-          window.location.href = "connexion.html";
+        const res = await fetch("/api/agenda", { credentials: "include" });
+        if (res.status === 401) return (window.location.href = "connexion.html");
+        agendas = await res.json();
+    
+        // S'il n'y a pas d'agenda, on en crée un par défaut
+        if (!agendas.length) {
+          await fetch("/api/agenda", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ nom: "defaut" }),
+          });
+          return chargerAgendas();
+        }
+    
+        agendaDefaut = agendas.find(a => a.nom === "defaut") || agendas[0];
+        afficherSemaine();
+      }
+    
+      function getMonday(d) {
+        d = new Date(d);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(d.setDate(diff));
+      }
+    
+      function afficherSemaine() {
+        const jours = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+        const container = document.getElementById("agendaContainer");
+        container.innerHTML = "";
+    
+        const header = document.createElement("div");
+        header.className = "week-grid week-header";
+        header.innerHTML = "<div></div>" + jours.map(j => `<div>${j}</div>`).join("");
+        container.appendChild(header);
+    
+        const heures = Array.from({ length: 10 }, (_, i) => i + 8); // 8h–17h
+        const weekDates = Array.from({ length: 7 }, (_, i) => new Date(currentWeekStart.getTime() + i * 86400000));
+        document.getElementById("weekLabel").textContent =
+          `Semaine du ${weekDates[0].toLocaleDateString()} au ${weekDates[6].toLocaleDateString()}`;
+    
+        heures.forEach(h => {
+          const row = document.createElement("div");
+          row.className = "week-grid";
+          row.innerHTML = `<div class='hour-cell'>${h}h</div>`;
+          weekDates.forEach(day => {
+            const cell = document.createElement("div");
+            cell.className = "day-cell";
+            const slotDate = new Date(day);
+            slotDate.setHours(h, 0, 0, 0);
+            cell.onclick = () => ouvrirModal(slotDate);
+            row.appendChild(cell);
+          });
+          container.appendChild(row);
+        });
+    
+        afficherRdvs(weekDates);
+      }
+    
+      function afficherRdvs(weekDates) {
+        if (!agendaDefaut) return;
+        agendaDefaut.rdvs.forEach(rdv => {
+          const date = new Date(rdv.date);
+          const col = (date.getDay() + 6) % 7; // lundi = 0
+          const row = date.getHours() - 8;
+          if (row >= 0 && row < 10 && col >= 0 && col < 7) {
+            const grid = document.querySelectorAll(".week-grid")[row + 1];
+            const cell = grid.children[col + 1];
+            const div = document.createElement("div");
+            div.className = "rdv";
+            div.textContent = rdv.titre;
+            div.title = rdv.description || "";
+            cell.appendChild(div);
+          }
+        });
+      }
+    
+      function ouvrirModal(date) {
+        selectedDate = date;
+        document.getElementById("modal").classList.remove("hidden");
+      }
+    
+      document.getElementById("closeModal").onclick = () =>
+        document.getElementById("modal").classList.add("hidden");
+    
+      document.getElementById("saveRdv").onclick = async () => {
+        const titre = document.getElementById("titre").value.trim();
+        const description = document.getElementById("desc").value.trim();
+        if (!titre) return alert("Titre requis");
+        if (!agendaDefaut) return alert("Aucun agenda trouvé !");
+    
+        const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ titre, description, date: selectedDate }),
+        });
+    
+        if (!res.ok) {
+          const err = await res.text();
+          alert("Erreur lors de l'ajout du RDV : " + err);
           return;
         }
-        const agendas = await res.json();
-        afficherAgendas(agendas);
-      }
-
-      function afficherAgendas(agendas) {
-        const container = document.getElementById("agendas");
-        container.innerHTML = "";
-        agendas.forEach((a) => {
-          const div = document.createElement("div");
-          div.className = "border rounded p-4 mb-4";
-
-          let rdvList = "";
-          a.rdvs.forEach(
-            (r) =>
-              (rdvList += `<li class='flex justify-between'>
-                ${r.titre} - ${new Date(r.date).toLocaleString()}
-                <button onclick="supprimerRdv('${a._id}','${r._id}')" class='text-red-500'>x</button>
-              </li>`)
-          );
-
-          div.innerHTML = `
-            <h2 class="font-bold mb-2">${a.nom}</h2>
-            <ul class="mb-2">${rdvList || "<li>Aucun RDV</li>"}</ul>
-            <div class="flex">
-              <input id="titre-${a._id}" placeholder="Titre" class="border p-1 mr-1 flex-1" />
-              <input id="date-${a._id}" type="datetime-local" class="border p-1 mr-1 flex-1" />
-              <button onclick="ajouterRdv('${a._id}')" class="bg-green-500 text-white px-2 rounded">+</button>
-            </div>
-          `;
-          container.appendChild(div);
-        });
-      }
-
-      async function ajouterRdv(agendaId) {
-        const titre = document.getElementById("titre-" + agendaId).value;
-        const date = document.getElementById("date-" + agendaId).value;
-        if (!titre || !date) return alert("Remplis le titre et la date");
-
-        await fetch(`/api/agenda/${agendaId}/rdv`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ titre, date }),
-        });
-
+    
+        document.getElementById("modal").classList.add("hidden");
+        document.getElementById("titre").value = "";
+        document.getElementById("desc").value = "";
         chargerAgendas();
-      }
-
-      async function supprimerRdv(agendaId, rdvId) {
-        await fetch(`/api/agenda/${agendaId}/rdv/${rdvId}`, { method: "DELETE" });
-        chargerAgendas();
-      }
-
-      document.getElementById("btnAddAgenda").addEventListener("click", async () => {
-        const nom = document.getElementById("agendaNom").value;
-        if (!nom) return alert("Nom obligatoire");
-        await fetch("/api/agenda", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nom }),
-        });
-        chargerAgendas();
-      });
-
-      document.getElementById("logoutBtn").addEventListener("click", async () => {
+      };
+    
+      document.getElementById("prevWeek").onclick = () => {
+        currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+        afficherSemaine();
+      };
+      document.getElementById("nextWeek").onclick = () => {
+        currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+        afficherSemaine();
+      };
+    
+      document.getElementById("logoutBtn").onclick = async () => {
         await fetch("/api/auth/logout", { method: "POST" });
         window.location.href = "connexion.html";
-      });
-
+      };
+    
       chargerAgendas();
     </script>
+    
   </body>
 </html>
