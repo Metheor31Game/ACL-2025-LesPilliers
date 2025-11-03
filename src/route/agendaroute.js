@@ -46,4 +46,26 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   res.json({ message: "Rendez-vous supprimé" });
 });
 
+// --- MODIFICATION D'UN RDV ---
+router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
+  const { agendaId, rdvId } = req.params;
+  const { titre, description, date } = req.body;
+
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId,
+  });
+  if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+
+  const rdv = agenda.rdvs.id(rdvId);
+  if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
+
+  if (titre) rdv.titre = titre;
+  if (description) rdv.description = description;
+  if (date) rdv.date = date;
+
+  await agenda.save();
+  res.json({ message: "Rendez-vous modifié" });
+});
+
 module.exports = router;
