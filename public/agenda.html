@@ -171,12 +171,13 @@
         if (!titre) return alert("Titre requis");
         if (!agendaDefaut) return alert("Aucun agenda trouvé !");
     
-        const res = await fetch(`/api/agenda/${agendaId}/rdv`, {
+        const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ titre, date }),
-        });
+          body: JSON.stringify({ titre, description, date: selectedDate }),
+    });
+
 
     
         if (!res.ok) {
