@@ -30,7 +30,7 @@ async function chargerAgendas() {
     return chargerAgendas();
   }
 
-  agendaDefaut = agendas.find(a => a.nom === "defaut") || agendas[0];
+  agendaDefaut = agendas.find((a) => a.nom === "defaut") || agendas[0];
   afficherSemaine();
 }
 
@@ -50,22 +50,24 @@ function afficherSemaine() {
 
   const header = document.createElement("div");
   header.className = "week-grid week-header";
-  header.innerHTML = "<div></div>" + jours.map(j => `<div>${j}</div>`).join("");
+  header.innerHTML =
+    "<div></div>" + jours.map((j) => `<div>${j}</div>`).join("");
   container.appendChild(header);
 
   const heures = Array.from({ length: 10 }, (_, i) => i + 8);
-  const weekDates = Array.from({ length: 7 }, (_, i) =>
-    new Date(currentWeekStart.getTime() + i * 86400000)
+  const weekDates = Array.from(
+    { length: 7 },
+    (_, i) => new Date(currentWeekStart.getTime() + i * 86400000)
   );
-  document.getElementById("weekLabel").textContent = `Semaine du ${
-    weekDates[0].toLocaleDateString()
-  } au ${weekDates[6].toLocaleDateString()}`;
+  document.getElementById(
+    "weekLabel"
+  ).textContent = `Semaine du ${weekDates[0].toLocaleDateString()} au ${weekDates[6].toLocaleDateString()}`;
 
-  heures.forEach(h => {
+  heures.forEach((h) => {
     const row = document.createElement("div");
     row.className = "week-grid";
     row.innerHTML = `<div class='hour-cell'>${h}h</div>`;
-    weekDates.forEach(day => {
+    weekDates.forEach((day) => {
       const cell = document.createElement("div");
       cell.className = "day-cell";
       const slotDate = new Date(day);
@@ -82,28 +84,46 @@ function afficherSemaine() {
 /* === Affiche les rendez-vous === */
 function afficherRdvs(weekDates) {
   if (!agendaDefaut) return;
-  agendaDefaut.rdvs.forEach(rdv => {
+  // calculer borne de la semaine affichée (inclusif)
+  const weekStart = new Date(weekDates[0]);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekDates[6]);
+  weekEnd.setHours(23, 59, 59, 999);
+
+  // parcourir les rdvs et n'afficher que ceux dont la date est dans la semaine
+  agendaDefaut.rdvs.forEach((rdv) => {
     const date = new Date(rdv.date);
-    const col = (date.getDay() + 6) % 7;
+
+    // ignorer les rdvs hors de la semaine affichée
+    if (date < weekStart || date > weekEnd) return;
+
+    const col = (date.getDay() + 6) % 7; // lundi=0
     const row = date.getHours() - 8;
-    if (row >= 0 && row < 10 && col >= 0 && col < 7) {
-      const grid = document.querySelectorAll(".week-grid")[row + 1];
-      const cell = grid.children[col + 1];
-      const div = document.createElement("div");
-      div.className = "rdv";
-      div.textContent = rdv.titre;
-      div.title = rdv.description || "";
+    if (row < 0 || row >= 10 || col < 0 || col >= 7) return;
 
-      // clic gauche → modifier
-      div.onclick = () => modifierRdv(rdv);
-      // clic droit → supprimer
-      div.oncontextmenu = e => {
-        e.preventDefault();
-        if (confirm("Supprimer ce rendez-vous ?")) supprimerRdv(rdv._id);
-      };
+    const grid = document.querySelectorAll(".week-grid")[row + 1];
+    if (!grid) return;
+    const cell = grid.children[col + 1];
+    if (!cell) return;
 
-      cell.appendChild(div);
-    }
+    const div = document.createElement("div");
+    div.className = "rdv";
+    div.textContent = rdv.titre;
+    div.title = rdv.description || "";
+
+    // clic gauche → modifier (stopPropagation pour éviter que la cellule parent n'ouvre un nouveau RDV)
+    div.onclick = (e) => {
+      e.stopPropagation();
+      modifierRdv(rdv);
+    };
+    // clic droit → supprimer (stopPropagation pour éviter déclenchements parents)
+    div.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (confirm("Supprimer ce rendez-vous ?")) supprimerRdv(rdv._id);
+    };
+
+    cell.appendChild(div);
   });
 }
 
@@ -163,10 +183,10 @@ async function supprimerRdv(rdvId) {
   if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
 
   try {
-    const res = await fetch(
-      `/api/agenda/${agendaDefaut._id}/rdv/${rdvId}`,
-      { method: "DELETE", credentials: "include" }
-    );
+    const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv/${rdvId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
     if (!res.ok) {
       const err = await res.text();
       return showNotif(err || "Erreur lors de la suppression", "error");
