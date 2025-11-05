@@ -1,0 +1,55 @@
+.week-grid {
+  display: grid;
+  grid-template-columns: 80px repeat(7, 1fr);
+  border: 1px solid #ddd;
+}
+
+.week-header {
+  display: contents;
+}
+
+.week-header div {
+  background: #f3f4f6;
+  text-align: center;
+  font-weight: 600;
+  padding: 6px;
+  border-bottom: 1px solid #ddd;
+}
+
+.hour-cell {
+  border-top: 1px solid #eee;
+  text-align: center;
+  padding: 4px;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.day-cell {
+  border: 1px solid #eee;
+  height: 60px;
+  position: relative;
+  cursor: pointer;
+}
+
+.rdv {
+  position: absolute;
+  inset: 4px;
+  background: #3b82f6;
+  color: white;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  padding: 2px 4px;
+  overflow: hidden;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* Notification styles */
+.notif-success {
+  background-color: #16a34a; /* vert */
+}
+.notif-error {
+  background-color: #dc2626; /* rouge */
+}

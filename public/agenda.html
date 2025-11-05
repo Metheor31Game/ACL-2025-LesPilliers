@@ -2,79 +2,64 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AgendaApp</title>
+    <title>Agenda - Vue hebdomadaire</title>
     <link rel="stylesheet" href="/output.css" />
+    <link rel="stylesheet" href="/agenda.css" />
   </head>
-  <body class="bg-gray-50 min-h-screen flex flex-col items-center p-6">
-    <div class="w-full max-w-md bg-white rounded-lg shadow-md p-6">
-      <h1 class="text-2xl font-bold mb-4 text-center">Mon Agenda</h1>
-      <button
-        class="w-full mb-4 py-2 px-4 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
-      >
-        Ajouter un événement
-      </button>
-      <button
-        id="logoutBtn"
-        class="w-full mb-4 py-2 px-4 bg-red-500 text-white rounded hover:bg-red-600 transition"
-      >
+
+  <body class="bg-gray-50 min-h-screen p-6">
+    <div
+      id="notif"
+      class="fixed top-4 left-1/2 transform -translate-x-1/2 hidden px-4 py-2 rounded shadow text-white text-sm"
+    ></div>
+    <div class="max-w-5xl mx-auto bg-white p-6 rounded shadow">
+      <h1 class="text-2xl font-bold mb-4 text-center">
+        Mon Agenda - Vue Hebdomadaire
+      </h1>
+
+      <div class="flex justify-between mb-4">
+        <button id="prevWeek" class="bg-gray-300 px-3 py-1 rounded">
+          ← Semaine précédente
+        </button>
+        <span id="weekLabel" class="font-semibold text-lg"></span>
+        <button id="nextWeek" class="bg-gray-300 px-3 py-1 rounded">
+          Semaine suivante →
+        </button>
+      </div>
+
+      <div id="agendaContainer" class="grid-container mb-6"></div>
+
+      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded">
         Déconnexion
       </button>
-      <ul class="space-y-3">
-        <li
-          class="flex items-center justify-between bg-gray-100 rounded px-3 py-2"
-        >
-          <span class="font-medium">Réunion projet - 15/10/2025 14h</span>
-          <button class="text-sm text-red-500 hover:underline">
-            Supprimer
-          </button>
-        </li>
-        <li
-          class="flex items-center justify-between bg-gray-100 rounded px-3 py-2"
-        >
-          <span class="font-medium">Appel client - 16/10/2025 10h</span>
-          <button class="text-sm text-red-500 hover:underline">
-            Supprimer
-          </button>
-        </li>
-        <li
-          class="flex items-center justify-between bg-gray-100 rounded px-3 py-2"
-        >
-          <span class="font-medium">Préparation dossier - 17/10/2025 09h</span>
-          <button class="text-sm text-red-500 hover:underline">
-            Supprimer
-          </button>
-        </li>
-      </ul>
     </div>
-    <script>
-      // Vérifie la connexion utilisateur au chargement de la page
-      fetch("/api/agenda")
-        .then((res) => {
-          if (res.status === 401) {
-            alert("Vous n'êtes pas connecté");
-            window.location.href = "connexion.html";
-            return;
-          }
-          return res.json();
-        })
-        .then((data) => {
-          if (data) {
-            // Afficher un message ou charger l'agenda
-            console.log(data.message);
-          }
-        });
-      // Déconnexion
-      document
-        .getElementById("logoutBtn")
-        .addEventListener("click", async () => {
-          const res = await fetch("/api/auth/logout", { method: "POST" });
-          if (res.ok) {
-            window.location.href = "connexion.html";
-          } else {
-            alert("Erreur lors de la déconnexion");
-          }
-        });
-    </script>
+
+    <!-- Modal ajout/modif RDV -->
+    <div
+      id="modal"
+      class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden"
+    >
+      <div class="bg-white p-4 rounded shadow w-80">
+        <h2 id="modalTitle" class="text-lg font-bold mb-2">Nouveau RDV</h2>
+        <input
+          id="titre"
+          placeholder="Titre"
+          class="border p-2 w-full mb-2 rounded"
+        />
+        <textarea
+          id="desc"
+          placeholder="Description"
+          class="border p-2 w-full mb-2 rounded"
+        ></textarea>
+        <button id="saveRdv" class="bg-green-500 text-white px-4 py-1 rounded">
+          Enregistrer
+        </button>
+        <button id="closeModal" class="ml-2 px-4 py-1 bg-gray-300 rounded">
+          Annuler
+        </button>
+      </div>
+    </div>
+
+    <script src="/agenda.js"></script>
   </body>
 </html>

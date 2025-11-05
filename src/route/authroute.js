@@ -1,59 +1,76 @@
 const express = require("express");
 const router = express.Router();
 const User = require("../model/personne");
+const Agenda = require("../model/Agenda");
 
-// Route de déconnexion
+// 🔹 Déconnexion
 router.post("/logout", (req, res) => {
   req.session.destroy((err) => {
-    if (err)
+    if (err) {
+      console.error("Erreur lors de la déconnexion :", err);
       return res
         .status(500)
         .json({ message: "Erreur lors de la déconnexion." });
+    }
     res.json({ message: "Déconnecté." });
   });
 });
 
-//route inscription
+// 🔹 Inscription
 router.post("/register", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Vérif si la personne existe
+    // Vérifier si l'utilisateur existe déjà
     const existing = await User.findOne({ username });
     if (existing) {
       return res.status(400).json({ message: "Cet identifiant existe déjà." });
     }
 
-    // Crée un nouvel utilisateur
+    // Créer le nouvel utilisateur
     const user = new User({ username, password });
     await user.save();
 
-    res.status(201).json({ message: " Inscription réussie !" });
+    // ✅ Créer automatiquement un agenda "defaut" vide
+    const agendaDefaut = new Agenda({
+      nom: "defaut",
+      rdvs: [],
+      userId: user._id,
+    });
+    await agendaDefaut.save();
+
+    // Stocker l'utilisateur dans la session
+    req.session.userId = user._id;
+
+    res
+      .status(201)
+      .json({ message: "Inscription réussie ! Agenda par défaut créé." });
   } catch (err) {
     console.error("Erreur lors de l’inscription :", err);
     res.status(500).json({ message: "Erreur serveur lors de l’inscription." });
   }
 });
 
-//route de connexion
+// 🔹 Connexion
 router.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    // Recherche de l'utilisateur
+    // Rechercher l'utilisateur
     const user = await User.findOne({ username });
     if (!user) {
       return res.status(400).json({ message: "Utilisateur introuvable." });
     }
 
-    // Vérif le mot de passe
+    // Vérifier le mot de passe
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       return res.status(400).json({ message: "Mot de passe incorrect." });
     }
 
-    // Réponse en cas de succès
+    // Enregistrer la session utilisateur
     req.session.userId = user._id;
+
     res.json({ message: `Bienvenue ${user.username}` });
   } catch (err) {
     console.error("Erreur lors de la connexion :", err);
@@ -62,3 +79,4 @@ router.post("/login", async (req, res) => {
 });
 
 module.exports = router;
+
