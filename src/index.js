@@ -13,8 +13,7 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
-/*Cette version utilise un chemin absolu : peu importe d’où tu lances le serveur, Express trouvera correctement public/*/
-app.use(express.static(path.join(__dirname, "../public"))); 
+app.use(express.static(path.join(__dirname, "../public"))); //par rapport a package.json
 
 mongoose
   .connect("mongodb://localhost:27017/agendaApp")
@@ -32,8 +31,8 @@ app.use(
 );
 
 app.use("/api/auth", authRoutes);
-app.use("/api", testRoutes);
 app.use("/api/agenda", agendaRoutes);
+app.use("/api/test", testRoutes);
 
 app.listen(PORT, () =>
   console.log(`🚀 Serveur en ligne : http://localhost:${PORT}`)

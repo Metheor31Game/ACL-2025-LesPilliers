@@ -219,13 +219,41 @@ document.getElementById("nextWeek").onclick = () => {
 };
 
 /* === Déconnexion === */
-document.getElementById("logoutBtn").onclick = async () => {
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "include",
+// Déconnexion — version robuste avec feedback utilisateur
+const logoutBtn = document.getElementById("logoutBtn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        alert("Déconnexion réussie !");
+        window.location.href = "connexion.html";
+      } else {
+        let error = {};
+        try {
+          error = await res.json();
+        } catch (e) {
+          /* ignore */
+        }
+        alert("Erreur : " + (error.message || "Déconnexion échouée"));
+      }
+    } catch (err) {
+      alert("Erreur réseau lors de la déconnexion");
+    }
   });
-  window.location.href = "connexion.html";
-};
+}
+
+// Accès aux paramètres de compte (si bouton présent)
+const accSettingsBtn = document.getElementById("accSettingsBtn");
+if (accSettingsBtn) {
+  accSettingsBtn.addEventListener("click", () => {
+    window.location.href = "accSettings.html";
+  });
+}
 
 /* === Initialisation === */
 chargerAgendas();
