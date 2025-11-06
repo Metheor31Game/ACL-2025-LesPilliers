@@ -5,7 +5,8 @@
 }
 
 .week-header {
-  display: contents;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
 }
 
 .week-header div {
