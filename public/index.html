@@ -1,19 +1,51 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-  <meta charset="UTF-8" />
-  
-  <title>Accueil - AgendaApp</title>
-  <link rel="icon" href="/favicon.ico" />
-  <link href="output.css" rel="stylesheet">
-  
+  <head>
+    <meta charset="UTF-8" />
 
-  
-</head>
-<body>
-  <h1>Bienvenue sur AgendaApp </h1>
+    <title>Accueil - AgendaApp</title>
+    <link rel="icon" href="/favicon.ico" />
+    <link href="output.css" rel="stylesheet" />
+    <link href="styles/common.css" rel="stylesheet" />
+  </head>
+  <body>
+    <header class="container site-header">
+      <div class="brand">
+        <div class="logo">A</div>
+        <div>
+          <div style="font-weight: 700">AgendaApp</div>
+          <div style="font-size: 0.85rem; color: var(--muted)">
+            Gérez vos rendez-vous simplement
+          </div>
+        </div>
+      </div>
+      <nav class="nav">
+        <a href="inscription.html">Inscription</a>
+        <a href="connexion.html">Connexion</a>
+        <a href="agenda.html">Mon agenda</a>
+      </nav>
+    </header>
 
-  <button onclick="window.location.href='inscription.html'">Inscription</button>
-  <button onclick="window.location.href='connexion.html'">Connexion</button>
-</body>
+    <main class="container">
+      <section class="hero">
+        <div class="hero-left">
+          <span class="kicker">Organisation</span>
+          <h1>Un agenda simple, rapide et collaboratif</h1>
+          <p>
+            Planifiez vos rendez-vous, partagez vos disponibilités et gardez le
+            contrôle de votre semaine. Interface claire, accessible depuis votre
+            navigateur.
+          </p>
+          <div style="display: flex; gap: 0.75rem; margin-top: 1rem">
+            <a class="btn btn-primary" href="inscription.html">Commencer</a>
+            <a class="btn btn-ghost" href="connexion.html">Se connecter</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="container site-footer">
+      <div>© 2025 AgendaApp — Les Pilliers</div>
+    </footer>
+  </body>
 </html>
