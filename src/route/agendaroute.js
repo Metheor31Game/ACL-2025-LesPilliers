@@ -69,3 +69,64 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 });
 
 module.exports = router;
+
+// renommer un agenda
+router.patch("/:agendaId", isAuthenticated, async (req, res) => {
+  const { nom } = req.body;
+  try {
+    const agenda = await Agenda.findOneAndUpdate(
+      { _id: req.params.agendaId, userId: req.session.userId },
+      { $set: { nom } },
+      { new: true }
+    );
+    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+    res.json(agenda);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// supprimer un agenda (et ses rdvs intégrés)
+router.delete("/:agendaId", isAuthenticated, async (req, res) => {
+  try {
+    const agenda = await Agenda.findOneAndDelete({ _id: req.params.agendaId, userId: req.session.userId });
+    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+    res.json({ message: "Agenda supprimé" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// modifier un RDV (dans le sous-document rdvs)
+router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
+  const { titre, description, date } = req.body;
+  try {
+    const agenda = await Agenda.findOne({ _id: req.params.agendaId, userId: req.session.userId });
+    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+
+    const rdv = agenda.rdvs.id(req.params.rdvId);
+    if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
+
+    if (titre !== undefined) rdv.titre = titre;
+    if (description !== undefined) rdv.description = description;
+    if (date !== undefined) rdv.date = date;
+
+    await agenda.save();
+    res.json(rdv);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// supprimer un RDV
+router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
+  try {
+    const agenda = await Agenda.findOne({ _id: req.params.agendaId, userId: req.session.userId });
+    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+    agenda.rdvs = agenda.rdvs.filter(r => r._id.toString() !== req.params.rdvId);
+    await agenda.save();
+    res.json({ message: "RDV supprimé" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
