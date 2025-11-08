@@ -39,7 +39,28 @@
         Paramètres de compte
       </button>
     </div>
+    <!-- Légende -->
+    <div id="legende" class="flex gap-4 mb-4"></div>
 
+    <!-- Créer agenda -->
+    <div class="flex gap-2 mb-4">
+      <input id="agendaNom" class="border p-2 rounded" placeholder="Nom du nouvel agenda" />
+      <button id="btnAddAgenda" class="bg-blue-500 text-white px-3 rounded">Ajouter</button>
+    </div>
+
+    <!-- Créer RDV simple (fallback) -->
+    <div class="flex gap-2 mb-4">
+      <input id="titreRdv" class="border p-2 rounded flex-1" placeholder="Titre du RDV" />
+      <input id="dateRdv" type="datetime-local" class="border p-2 rounded" />
+      <select id="selectAgenda" class="border p-2 rounded"></select>
+    <button id="btnAddRdv" class="bg-green-500 text-white px-3 rounded">Enregistrer</button>
+    </div>
+
+<!-- Calendrier : conteneur -->
+<div id="agendaContainer" class="mb-6"></div>
+
+<!-- Notification -->
+<div id="notif" class="hidden"></div>
     <!-- Modal ajout/modif RDV -->
     <div
       id="modal"
