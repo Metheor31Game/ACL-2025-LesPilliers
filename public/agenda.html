@@ -51,6 +51,15 @@
           placeholder="Description"
           class="border p-2 w-full mb-2 rounded"
         ></textarea>
+
+        <label class="block mb-1 font-semibold">Répétition :</label>
+        <select id="recurrence" class="border p-2 w-full mb-2 rounded">
+          <option value="AUCUNE">Aucune</option>
+          <option value="JOUR">Tous les jours</option>
+          <option value="SEMAINE">Chaque semaine</option>
+          <option value="MOIS">Chaque mois</option>
+        </select>
+
         <button id="saveRdv" class="bg-green-500 text-white px-4 py-1 rounded">
           Enregistrer
         </button>
@@ -59,7 +68,6 @@
         </button>
       </div>
     </div>
-
     <script src="/agenda.js"></script>
   </body>
 </html>
