@@ -42,28 +42,6 @@ function getMonday(d) {
   return new Date(d.setDate(diff));
 }
 
-/* === Génère les occurrences d’un RDV récurrent === */
-function genererOccurrences(rdv, semaineDebut, semaineFin) {
-  const occs = [];
-  let d = new Date(rdv.date);
-  if (!rdv.recurrence || rdv.recurrence.freq === "AUCUNE") return [d];
-
-  while (d <= semaineFin) {
-    if (d >= semaineDebut) occs.push(new Date(d));
-
-    if (rdv.recurrence.freq === "JOUR")
-      d.setDate(d.getDate() + (rdv.recurrence.interval || 1));
-    else if (rdv.recurrence.freq === "SEMAINE")
-      d.setDate(d.getDate() + 7 * (rdv.recurrence.interval || 1));
-    else if (rdv.recurrence.freq === "MOIS")
-      d.setMonth(d.getMonth() + (rdv.recurrence.interval || 1));
-
-    if (rdv.recurrence.until && d > new Date(rdv.recurrence.until)) break;
-    if (rdv.recurrence.count && occs.length >= rdv.recurrence.count) break;
-  }
-  return occs;
-}
-
 /* === Affiche la grille de la semaine === */
 function afficherSemaine() {
   const jours = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
@@ -81,7 +59,6 @@ function afficherSemaine() {
     { length: 7 },
     (_, i) => new Date(currentWeekStart.getTime() + i * 86400000)
   );
-
   document.getElementById(
     "weekLabel"
   ).textContent = `Semaine du ${weekDates[0].toLocaleDateString()} au ${weekDates[6].toLocaleDateString()}`;
@@ -104,110 +81,130 @@ function afficherSemaine() {
   afficherRdvs(weekDates);
 }
 
-/* === Affiche les RDV === */
+/* === Affiche les rendez-vous === */
 function afficherRdvs(weekDates) {
   if (!agendaDefaut) return;
-  const semaineDebut = weekDates[0];
-  const semaineFin = weekDates[6];
+  // calculer borne de la semaine affichée (inclusif)
+  const weekStart = new Date(weekDates[0]);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekDates[6]);
+  weekEnd.setHours(23, 59, 59, 999);
 
+  // parcourir les rdvs et n'afficher que ceux dont la date est dans la semaine
   agendaDefaut.rdvs.forEach((rdv) => {
-    const occs = genererOccurrences(rdv, semaineDebut, semaineFin);
-    occs.forEach((date) => afficherRdvUnitaire(rdv, date));
+    const date = new Date(rdv.date);
+
+    // ignorer les rdvs hors de la semaine affichée
+    if (date < weekStart || date > weekEnd) return;
+
+    const col = (date.getDay() + 6) % 7; // lundi=0
+    const row = date.getHours() - 8;
+    if (row < 0 || row >= 10 || col < 0 || col >= 7) return;
+
+    const grid = document.querySelectorAll(".week-grid")[row + 1];
+    if (!grid) return;
+    const cell = grid.children[col + 1];
+    if (!cell) return;
+
+    const div = document.createElement("div");
+    div.className = "rdv";
+    div.textContent = rdv.titre;
+    div.title = rdv.description || "";
+
+    // clic gauche → modifier (stopPropagation pour éviter que la cellule parent n'ouvre un nouveau RDV)
+    div.onclick = (e) => {
+      e.stopPropagation();
+      modifierRdv(rdv);
+    };
+    // clic droit → supprimer (stopPropagation pour éviter déclenchements parents)
+    div.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (confirm("Supprimer ce rendez-vous ?")) supprimerRdv(rdv._id);
+    };
+
+    cell.appendChild(div);
   });
 }
 
-/* === Affiche un seul RDV === */
-function afficherRdvUnitaire(rdv, date) {
-  const col = (date.getDay() + 6) % 7;
-  const row = date.getHours() - 8;
-  if (row < 0 || row >= 10 || col < 0 || col >= 7) return;
-
-  const grid = document.querySelectorAll(".week-grid")[row + 1];
-  const cell = grid.children[col + 1];
-  const div = document.createElement("div");
-  div.className = "rdv";
-  div.textContent = rdv.titre;
-  div.title = rdv.description || "";
-
-  div.onclick = () => modifierRdv(rdv);
-  div.oncontextmenu = (e) => {
-    e.preventDefault();
-    if (confirm("Supprimer ce rendez-vous ?")) supprimerRdv(rdv._id);
-  };
-  cell.appendChild(div);
-}
-
-/* === Ouvre la fenêtre d’ajout === */
+/* === Ouvre la fenêtre d'ajout/modif === */
 function ouvrirModal(date) {
   rdvEnEdition = null;
   selectedDate = date;
   document.getElementById("modalTitle").textContent = "Nouveau RDV";
   document.getElementById("titre").value = "";
   document.getElementById("desc").value = "";
-  document.getElementById("recurrence").value = "AUCUNE";
   document.getElementById("modal").classList.remove("hidden");
 }
 
-/* === Ferme la fenêtre === */
+/* === Fermer la fenêtre === */
 document.getElementById("closeModal").onclick = () =>
   document.getElementById("modal").classList.add("hidden");
 
-/* === Enregistre (ajout/modif) === */
+/* === Enregistrer (ajout/modif) === */
 document.getElementById("saveRdv").onclick = async () => {
   const titre = document.getElementById("titre").value.trim();
   const description = document.getElementById("desc").value.trim();
-  const recurrenceFreq = document.getElementById("recurrence").value;
-
   if (!titre) return showNotif("Titre requis", "error");
   if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
-
-  const recurrence =
-    recurrenceFreq === "AUCUNE"
-      ? { freq: "AUCUNE" }
-      : { freq: recurrenceFreq, interval: 1 };
 
   const url = rdvEnEdition
     ? `/api/agenda/${agendaDefaut._id}/rdv/${rdvEnEdition._id}`
     : `/api/agenda/${agendaDefaut._id}/rdv`;
   const method = rdvEnEdition ? "PUT" : "POST";
-  const body = JSON.stringify({ titre, description, date: selectedDate, recurrence });
+  const body = JSON.stringify({ titre, description, date: selectedDate });
 
-  const res = await fetch(url, {
-    method,
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body,
-  });
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body,
+    });
 
-  if (!res.ok) {
-    const err = await res.text();
-    return showNotif(err || "Erreur lors de l'enregistrement", "error");
+    if (!res.ok) {
+      const err = await res.text();
+      return showNotif(err || "Erreur lors de l'enregistrement", "error");
+    }
+
+    document.getElementById("modal").classList.add("hidden");
+    showNotif(
+      rdvEnEdition ? "Rendez-vous modifié" : "Rendez-vous ajouté",
+      "success"
+    );
+    chargerAgendas();
+  } catch (e) {
+    showNotif("Erreur réseau lors de l'enregistrement", "error");
   }
-
-  document.getElementById("modal").classList.add("hidden");
-  showNotif("Rendez-vous enregistré", "success");
-  chargerAgendas();
 };
 
-/* === Suppression === */
+/* === Suppression d'un RDV === */
 async function supprimerRdv(rdvId) {
-  const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv/${rdvId}`, {
-    method: "DELETE",
-    credentials: "include",
-  });
-  if (!res.ok) return showNotif("Erreur lors de la suppression", "error");
-  showNotif("Rendez-vous supprimé", "success");
-  chargerAgendas();
+  if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
+
+  try {
+    const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv/${rdvId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      return showNotif(err || "Erreur lors de la suppression", "error");
+    }
+    showNotif("Rendez-vous supprimé", "success");
+    chargerAgendas();
+  } catch (e) {
+    showNotif("Erreur réseau lors de la suppression", "error");
+  }
 }
 
-/* === Modification === */
+/* === Modification d'un RDV === */
 function modifierRdv(rdv) {
   rdvEnEdition = rdv;
   selectedDate = new Date(rdv.date);
   document.getElementById("modalTitle").textContent = "Modifier RDV";
   document.getElementById("titre").value = rdv.titre;
   document.getElementById("desc").value = rdv.description || "";
-  document.getElementById("recurrence").value = rdv.recurrence?.freq || "AUCUNE";
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -222,13 +219,41 @@ document.getElementById("nextWeek").onclick = () => {
 };
 
 /* === Déconnexion === */
-document.getElementById("logoutBtn").onclick = async () => {
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "include",
+// Déconnexion — version robuste avec feedback utilisateur
+const logoutBtn = document.getElementById("logoutBtn");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (res.ok) {
+        alert("Déconnexion réussie !");
+        window.location.href = "connexion.html";
+      } else {
+        let error = {};
+        try {
+          error = await res.json();
+        } catch (e) {
+          /* ignore */
+        }
+        alert("Erreur : " + (error.message || "Déconnexion échouée"));
+      }
+    } catch (err) {
+      alert("Erreur réseau lors de la déconnexion");
+    }
   });
-  window.location.href = "connexion.html";
-};
+}
+
+// Accès aux paramètres de compte (si bouton présent)
+const accSettingsBtn = document.getElementById("accSettingsBtn");
+if (accSettingsBtn) {
+  accSettingsBtn.addEventListener("click", () => {
+    window.location.href = "accSettings.html";
+  });
+}
 
 /* === Initialisation === */
 chargerAgendas();
