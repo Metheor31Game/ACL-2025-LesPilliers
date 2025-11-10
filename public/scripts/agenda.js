@@ -281,12 +281,81 @@ if (logoutBtn) {
 }
 
 // Accès aux paramètres de compte (si bouton présent)
-const accSettingsBtn = document.getElementById("accSettingsBtn");
-if (accSettingsBtn) {
-  accSettingsBtn.addEventListener("click", () => {
-    window.location.href = "accSettings.html";
-  });
+// Ouvrir modal de modification du compte
+const accountBtn = document.getElementById("accountBtn");
+if (accountBtn) {
+  accountBtn.addEventListener("click", openAccountModal);
 }
+
+function openAccountModal() {
+  const modal = document.getElementById("accountModal");
+  if (!modal) return;
+  // préremplir le pseudo si disponible
+  try {
+    const name = localStorage.getItem("username");
+    const input = document.getElementById("accountUsername");
+    if (name && input) input.value = name;
+  } catch (e) {
+    /* ignore */
+  }
+  modal.classList.remove("hidden");
+}
+
+function closeAccountModal() {
+  const modal = document.getElementById("accountModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+}
+
+document.getElementById("closeAccountModal")?.addEventListener("click", () => {
+  closeAccountModal();
+});
+
+// Soumission du formulaire de modification du compte
+document.getElementById("saveAccount")?.addEventListener("click", async () => {
+  const username = document.getElementById("accountUsername")?.value?.trim();
+  const password =
+    document.getElementById("accountPassword")?.value || undefined;
+
+  if (!username && !password) {
+    showNotif("Renseignez un nouveau pseudo ou mot de passe", "error");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/auth/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        username: username || undefined,
+        password: password || undefined,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showNotif(data.message || "Erreur lors de la mise à jour", "error");
+      return;
+    }
+
+    // mise à jour ok: mettre à jour l'affichage et localStorage
+    if (username) {
+      try {
+        localStorage.setItem("username", username);
+      } catch (e) {
+        /* ignore */
+      }
+      const acctEl = document.getElementById("accountName");
+      if (acctEl) acctEl.textContent = username;
+    }
+
+    showNotif(data.message || "Compte mis à jour", "success");
+    closeAccountModal();
+  } catch (err) {
+    showNotif("Erreur réseau lors de la mise à jour", "error");
+  }
+});
 
 /* === Initialisation === */
 // afficher nom de compte si disponible (stocké après connexion)
@@ -299,5 +368,28 @@ if (acctEl) {
     /* ignore */
   }
 }
+
+/* Password visibility toggles for any .pw-toggle buttons on this page (account modal) */
+(function initPwToggles() {
+  const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  const eyeOffSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.66 21.66 0 0 1 5.06-6.09"></path><path d="M1 1l22 22"></path></svg>`;
+
+  document.querySelectorAll(".pw-toggle").forEach((btn) => {
+    const targetId = btn.dataset.target;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    // ensure initial icon present
+    if (!btn.innerHTML.trim()) btn.innerHTML = eyeSvg;
+    btn.addEventListener("click", () => {
+      const isPwd = input.type === "password";
+      input.type = isPwd ? "text" : "password";
+      btn.innerHTML = isPwd ? eyeOffSvg : eyeSvg;
+      btn.setAttribute(
+        "aria-label",
+        isPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"
+      );
+    });
+  });
+})();
 
 chargerAgendas();

@@ -30,8 +30,8 @@
         <div class="header-right" id="accountArea">
           <!-- Account name populated by JS if available -->
           <span id="accountName" class="account-name">Mon Compte</span>
-          <a
-            href="/accSettings.html"
+          <button
+            id="accountBtn"
             class="account-btn"
             title="Paramètres du compte"
           >
@@ -59,7 +59,7 @@
                 stroke-linejoin="round"
               />
             </svg>
-          </a>
+          </button>
         </div>
       </header>
 
@@ -94,6 +94,50 @@
             Supprimer
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal modification du compte -->
+    <div id="accountModal" class="fixed inset-0 modal-overlay hidden">
+      <div class="modal-card">
+        <h2 class="modal-title">Modifier le compte</h2>
+        <div class="modal-date note">Modifier votre pseudo ou mot de passe</div>
+
+        <form id="accountForm">
+          <label for="accountUsername" class="note">Nom d'utilisateur</label>
+          <input
+            id="accountUsername"
+            name="username"
+            class="input mb-2"
+            placeholder="Laisser vide pour ne pas changer"
+          />
+
+          <label for="accountPassword" class="note">Nouveau mot de passe</label>
+          <div class="pw-wrapper">
+            <input
+              id="accountPassword"
+              name="password"
+              type="password"
+              class="input mb-3"
+              placeholder="Laisser vide pour ne pas changer"
+            />
+            <button
+              type="button"
+              class="pw-toggle"
+              data-target="accountPassword"
+              aria-label="Afficher le mot de passe"
+            ></button>
+          </div>
+
+          <div class="modal-actions">
+            <button type="button" id="saveAccount" class="btn btn-primary">
+              Enregistrer
+            </button>
+            <button type="button" id="closeAccountModal" class="btn btn-ghost">
+              Annuler
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
