@@ -41,28 +41,29 @@
     </div>
 
     <!-- Modal ajout/modif RDV -->
-    <div
-      id="modal"
-      class="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center hidden"
-    >
-      <div class="bg-white p-4 rounded shadow w-80">
-        <h2 id="modalTitle" class="text-lg font-bold mb-2">Nouveau RDV</h2>
-        <input
-          id="titre"
-          placeholder="Titre"
-          class="border p-2 w-full mb-2 rounded"
-        />
+    <div id="modal" class="fixed inset-0 modal-overlay hidden">
+      <div class="modal-card">
+        <h2 id="modalTitle" class="modal-title">Nouveau RDV</h2>
+        <div id="modalDateInfo" class="modal-date note">&nbsp;</div>
+
+        <label for="titre" class="note">Titre</label>
+        <input id="titre" placeholder="Titre" class="input mb-2" />
+
+        <label for="desc" class="note">Description</label>
         <textarea
           id="desc"
           placeholder="Description"
-          class="border p-2 w-full mb-2 rounded"
+          class="input mb-3"
+          rows="4"
         ></textarea>
-        <button id="saveRdv" class="bg-green-500 text-white px-4 py-1 rounded">
-          Enregistrer
-        </button>
-        <button id="closeModal" class="ml-2 px-4 py-1 bg-gray-300 rounded">
-          Annuler
-        </button>
+
+        <div class="modal-actions">
+          <button id="saveRdv" class="btn btn-primary">Enregistrer</button>
+          <button id="closeModal" class="btn btn-ghost">Annuler</button>
+          <button id="deleteRdv" class="btn btn-ghost text-red-600 hidden">
+            Supprimer
+          </button>
+        </div>
       </div>
     </div>
 

@@ -4,6 +4,15 @@ let selectedDate = null;
 let currentWeekStart = getMonday(new Date());
 let rdvEnEdition = null;
 
+/* === Helpers === */
+function formatDateRange(d) {
+  if (!d) return "";
+  const dateStr = d.toLocaleDateString();
+  const startH = d.getHours();
+  const endH = startH + 1;
+  return `${dateStr} · ${startH}h - ${endH}h`;
+}
+
 /* === Notification visuelle === */
 function showNotif(message, type = "success") {
   const notif = document.getElementById("notif");
@@ -116,11 +125,10 @@ function afficherRdvs(weekDates) {
       e.stopPropagation();
       modifierRdv(rdv);
     };
-    // clic droit → supprimer (stopPropagation pour éviter déclenchements parents)
+    // clic droit suppression retirée: suppression via le modal maintenant
     div.oncontextmenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (confirm("Supprimer ce rendez-vous ?")) supprimerRdv(rdv._id);
     };
 
     cell.appendChild(div);
@@ -134,12 +142,22 @@ function ouvrirModal(date) {
   document.getElementById("modalTitle").textContent = "Nouveau RDV";
   document.getElementById("titre").value = "";
   document.getElementById("desc").value = "";
+  // afficher date/plage
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = formatDateRange(selectedDate);
+  // masquer bouton supprimer
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) delBtn.classList.add("hidden");
   document.getElementById("modal").classList.remove("hidden");
 }
 
 /* === Fermer la fenêtre === */
-document.getElementById("closeModal").onclick = () =>
+document.getElementById("closeModal").onclick = () => {
+  rdvEnEdition = null;
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = "";
   document.getElementById("modal").classList.add("hidden");
+};
 
 /* === Enregistrer (ajout/modif) === */
 document.getElementById("saveRdv").onclick = async () => {
@@ -205,6 +223,21 @@ function modifierRdv(rdv) {
   document.getElementById("modalTitle").textContent = "Modifier RDV";
   document.getElementById("titre").value = rdv.titre;
   document.getElementById("desc").value = rdv.description || "";
+  // afficher date/plage
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = formatDateRange(selectedDate);
+  // afficher bouton supprimer et lier
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) {
+    delBtn.classList.remove("hidden");
+    delBtn.onclick = async () => {
+      if (!rdvEnEdition) return;
+      // fermer modal puis supprimer
+      document.getElementById("modal").classList.add("hidden");
+      await supprimerRdv(rdvEnEdition._id);
+      rdvEnEdition = null;
+    };
+  }
   document.getElementById("modal").classList.remove("hidden");
 }
 
