@@ -59,6 +59,12 @@ if (form) {
 
       // Connexion réussie : rediriger vers l'agenda sans afficher de popup
       await res.json().catch(() => null);
+      // store username locally so pages can display account name without extra backend call
+      try {
+        localStorage.setItem("username", username);
+      } catch (e) {
+        /* ignore */
+      }
       window.location.href = "agenda.html";
     } catch (err) {
       alert("Erreur réseau lors de la connexion");

@@ -93,3 +93,42 @@
   justify-content: flex-end;
   margin-top: 0.5rem;
 }
+
+/* Header and account area */
+.agenda-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.agenda-header .header-left {
+  flex: 1 1 auto;
+}
+.agenda-header .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.btn-muted {
+  background: #eef2ff; /* subtle light */
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-muted:hover {
+  background: #e6eeff;
+}
+.week-label {
+  min-width: 220px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Responsive tweak for the grid on small screens */
+@media (max-width: 700px) {
+  .week-grid {
+    grid-template-columns: 60px repeat(7, 1fr);
+  }
+}

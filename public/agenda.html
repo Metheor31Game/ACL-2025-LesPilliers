@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>Agenda - Vue hebdomadaire</title>
     <link rel="stylesheet" href="/output.css" />
+    <link rel="stylesheet" href="/styles/common.css" />
     <link rel="stylesheet" href="/styles/agenda.css" />
   </head>
 
@@ -13,31 +14,60 @@
       class="fixed top-4 left-1/2 transform -translate-x-1/2 hidden px-4 py-2 rounded shadow text-white text-sm"
     ></div>
     <div class="max-w-5xl mx-auto bg-white p-6 rounded shadow">
-      <h1 class="text-2xl font-bold mb-4 text-center">
-        Mon Agenda - Vue Hebdomadaire
-      </h1>
+      <!-- Header: title + account area -->
+      <header class="agenda-header mb-4">
+        <div class="header-left">
+          <h1 class="text-2xl font-bold">Mon Agenda - Vue Hebdomadaire</h1>
+          <div class="controls mt-3">
+            <button id="prevWeek" class="btn-muted">
+              ← Semaine précédente
+            </button>
+            <span id="weekLabel" class="week-label"></span>
+            <button id="nextWeek" class="btn-muted">Semaine suivante →</button>
+          </div>
+        </div>
 
-      <div class="flex justify-between mb-4">
-        <button id="prevWeek" class="bg-gray-300 px-3 py-1 rounded">
-          ← Semaine précédente
-        </button>
-        <span id="weekLabel" class="font-semibold text-lg"></span>
-        <button id="nextWeek" class="bg-gray-300 px-3 py-1 rounded">
-          Semaine suivante →
-        </button>
-      </div>
+        <div class="header-right" id="accountArea">
+          <!-- Account name populated by JS if available -->
+          <span id="accountName" class="account-name">Mon Compte</span>
+          <a
+            href="/accSettings.html"
+            class="account-btn"
+            title="Paramètres du compte"
+          >
+            <!-- simple avatar / user icon -->
+            <svg
+              width="28"
+              height="28"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              aria-hidden="true"
+            >
+              <circle
+                cx="12"
+                cy="8"
+                r="3.2"
+                stroke="currentColor"
+                stroke-width="1.2"
+              />
+              <path
+                d="M4.5 19c0-3.3 3.4-6 7.5-6s7.5 2.7 7.5 6"
+                stroke="currentColor"
+                stroke-width="1.2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </a>
+        </div>
+      </header>
 
       <div id="agendaContainer" class="grid-container mb-6"></div>
 
-      <button id="logoutBtn" class="bg-red-500 text-white px-4 py-2 rounded">
-        Déconnexion
-      </button>
-      <button
-        id="accSettingsBtn"
-        class="w-full mb-4 py-2 px-4 bg-red-500 text-white rounded hover:bg-red-600 transition"
-      >
-        Paramètres de compte
-      </button>
+      <div class="mt-4 actions-row">
+        <button id="logoutBtn" class="btn-danger">Déconnexion</button>
+      </div>
     </div>
 
     <!-- Modal ajout/modif RDV -->

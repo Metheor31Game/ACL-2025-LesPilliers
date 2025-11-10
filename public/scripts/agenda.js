@@ -289,4 +289,15 @@ if (accSettingsBtn) {
 }
 
 /* === Initialisation === */
+// afficher nom de compte si disponible (stocké après connexion)
+const acctEl = document.getElementById("accountName");
+if (acctEl) {
+  try {
+    const name = localStorage.getItem("username");
+    if (name) acctEl.textContent = name;
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 chargerAgendas();

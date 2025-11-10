@@ -241,3 +241,78 @@ body {
   height: 18px;
   display: block;
 }
+
+/* Agenda header & account (shared UI used by agenda page) */
+.agenda-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.agenda-header .header-left {
+  flex: 1 1 auto;
+}
+.agenda-header .controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.btn-muted {
+  background: #eef2ff; /* subtle light */
+  color: var(--text);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-muted:hover {
+  background: #e6eeff;
+}
+.week-label {
+  min-width: 220px;
+  text-align: center;
+  font-weight: 600;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.account-name {
+  color: var(--text);
+  font-weight: 600;
+}
+.account-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--text);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+  padding: 4px;
+  text-decoration: none;
+}
+.account-btn:hover {
+  background: #eef2ff;
+}
+
+.actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 8px;
+}
+.btn-danger {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-danger:hover {
+  background: #dc2626;
+}
