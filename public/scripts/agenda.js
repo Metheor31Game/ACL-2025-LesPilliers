@@ -57,20 +57,51 @@ function afficherSemaine() {
   const container = document.getElementById("agendaContainer");
   container.innerHTML = "";
 
-  const header = document.createElement("div");
-  header.className = "week-grid week-header";
-  header.innerHTML =
-    "<div></div>" + jours.map((j) => `<div>${j}</div>`).join("");
-  container.appendChild(header);
-
-  const heures = Array.from({ length: 10 }, (_, i) => i + 8);
   const weekDates = Array.from(
     { length: 7 },
     (_, i) => new Date(currentWeekStart.getTime() + i * 86400000)
   );
-  document.getElementById(
-    "weekLabel"
-  ).textContent = `Semaine du ${weekDates[0].toLocaleDateString()} au ${weekDates[6].toLocaleDateString()}`;
+
+  const header = document.createElement("div");
+  header.className = "week-grid week-header";
+
+  // build header cells showing day name + date number (eg. "Lun 12")
+  const headerCells = ["<div></div>"];
+  weekDates.forEach((d, i) => {
+    const dayName = jours[i];
+    const dayNum = d.getDate();
+    const isToday = new Date().toDateString() === d.toDateString();
+    const cls = isToday ? "today" : "";
+    headerCells.push(
+      `<div class="${cls}">${dayName} <span class="day-num">${dayNum}</span></div>`
+    );
+  });
+  header.innerHTML = headerCells.join("");
+  container.appendChild(header);
+
+  const heures = Array.from({ length: 10 }, (_, i) => i + 8);
+  // update month/year display for the current week
+  const monthEl = document.getElementById("monthYear");
+  if (monthEl) {
+    const startMonth = weekDates[0].toLocaleDateString("fr-FR", {
+      month: "long",
+    });
+    const endMonth = weekDates[6].toLocaleDateString("fr-FR", {
+      month: "long",
+    });
+    const startYear = weekDates[0].getFullYear();
+    const endYear = weekDates[6].getFullYear();
+    let text = "";
+    if (startMonth === endMonth && startYear === endYear) {
+      text = `${startMonth} ${startYear}`;
+    } else if (startYear === endYear) {
+      text = `${startMonth} - ${endMonth} ${startYear}`;
+    } else {
+      text = `${startMonth} ${startYear} - ${endMonth} ${endYear}`;
+    }
+    // Capitalize first letter
+    monthEl.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+  }
 
   heures.forEach((h) => {
     const row = document.createElement("div");
@@ -242,14 +273,32 @@ function modifierRdv(rdv) {
 }
 
 /* === Navigation entre semaines === */
-document.getElementById("prevWeek").onclick = () => {
-  currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+function changeWeek(weeks) {
+  currentWeekStart.setDate(currentWeekStart.getDate() + weeks * 7);
   afficherSemaine();
-};
-document.getElementById("nextWeek").onclick = () => {
-  currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-  afficherSemaine();
-};
+}
+
+document.getElementById("prevWeek").onclick = () => changeWeek(-1);
+document.getElementById("nextWeek").onclick = () => changeWeek(1);
+
+// Keyboard navigation: left/right arrows change the week
+document.addEventListener("keydown", (e) => {
+  // ignore when focus is on an input, textarea or contenteditable
+  const tag = document.activeElement && document.activeElement.tagName;
+  const isInput =
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    document.activeElement.isContentEditable;
+  if (isInput) return;
+
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    changeWeek(-1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    changeWeek(1);
+  }
+});
 
 /* === Déconnexion === */
 // Déconnexion — version robuste avec feedback utilisateur
