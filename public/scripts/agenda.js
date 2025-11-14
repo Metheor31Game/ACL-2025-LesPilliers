@@ -17,7 +17,10 @@ function showNotif(message, type = "success") {
 
 /* === Chargement des agendas === */
 async function chargerAgendas() {
-  const res = await fetch("/api/agenda", { credentials: "include" });
+  const res = await fetch(`/api/agenda?week=${currentWeekStart.toISOString()}`, {
+  credentials: "include",
+  });
+
   if (res.status === 401) return (window.location.href = "connexion.html");
   agendas = await res.json();
 
@@ -106,10 +109,15 @@ function afficherRdvs(weekDates) {
     const cell = grid.children[col + 1];
     if (!cell) return;
 
+    //Marquer visuellement les RDVs permanents
     const div = document.createElement("div");
     div.className = "rdv";
-    div.textContent = rdv.titre;
+
+    const isWeekly = rdv.recurrence === "weekly";
+    div.textContent = isWeekly ? `${rdv.titre} (perm.)` : rdv.titre;
+
     div.title = rdv.description || "";
+
 
     // clic gauche → modifier (stopPropagation pour éviter que la cellule parent n'ouvre un nouveau RDV)
     div.onclick = (e) => {
@@ -127,13 +135,19 @@ function afficherRdvs(weekDates) {
   });
 }
 
-/* === Ouvre la fenêtre d'ajout/modif === */
+/* === Ouvre la fenêtre d'ajout/modif  rdv-perm === */
 function ouvrirModal(date) {
   rdvEnEdition = null;
   selectedDate = date;
   document.getElementById("modalTitle").textContent = "Nouveau RDV";
   document.getElementById("titre").value = "";
   document.getElementById("desc").value = "";
+  // afficher date/plage
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = formatDateRange(selectedDate);
+  // masquer bouton supprimer
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) delBtn.classList.add("hidden");
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -141,10 +155,13 @@ function ouvrirModal(date) {
 document.getElementById("closeModal").onclick = () =>
   document.getElementById("modal").classList.add("hidden");
 
-/* === Enregistrer (ajout/modif) === */
+/* === Enregistrer (ajout/modif) rdv-perm === */
 document.getElementById("saveRdv").onclick = async () => {
   const titre = document.getElementById("titre").value.trim();
   const description = document.getElementById("desc").value.trim();
+  const recurrence =
+    document.getElementById("recurrence")?.value || "none";
+
   if (!titre) return showNotif("Titre requis", "error");
   if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
 
@@ -152,7 +169,13 @@ document.getElementById("saveRdv").onclick = async () => {
     ? `/api/agenda/${agendaDefaut._id}/rdv/${rdvEnEdition._id}`
     : `/api/agenda/${agendaDefaut._id}/rdv`;
   const method = rdvEnEdition ? "PUT" : "POST";
-  const body = JSON.stringify({ titre, description, date: selectedDate });
+
+  const body = JSON.stringify({
+    titre,
+    description,
+    date: selectedDate,
+    recurrence,
+  });
 
   try {
     const res = await fetch(url, {
@@ -178,6 +201,7 @@ document.getElementById("saveRdv").onclick = async () => {
   }
 };
 
+
 /* === Suppression d'un RDV === */
 async function supprimerRdv(rdvId) {
   if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
@@ -198,25 +222,58 @@ async function supprimerRdv(rdvId) {
   }
 }
 
-/* === Modification d'un RDV === */
+/* === Modification d'un RDV  rdv-perm=== */
 function modifierRdv(rdv) {
   rdvEnEdition = rdv;
   selectedDate = new Date(rdv.date);
   document.getElementById("modalTitle").textContent = "Modifier RDV";
   document.getElementById("titre").value = rdv.titre;
   document.getElementById("desc").value = rdv.description || "";
+  // afficher date/plage
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = formatDateRange(selectedDate);
+  // afficher bouton supprimer et lier
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) {
+    delBtn.classList.remove("hidden");
+    delBtn.onclick = async () => {
+      if (!rdvEnEdition) return;
+      // fermer modal puis supprimer
+      document.getElementById("modal").classList.add("hidden");
+      await supprimerRdv(rdvEnEdition._id);
+      rdvEnEdition = null;
+    };
+  }
   document.getElementById("modal").classList.remove("hidden");
 }
 
 /* === Navigation entre semaines === */
-document.getElementById("prevWeek").onclick = () => {
-  currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+function changeWeek(weeks) {
+  currentWeekStart.setDate(currentWeekStart.getDate() + weeks * 7);
   afficherSemaine();
-};
-document.getElementById("nextWeek").onclick = () => {
-  currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-  afficherSemaine();
-};
+}
+
+document.getElementById("prevWeek").onclick = () => changeWeek(-1);
+document.getElementById("nextWeek").onclick = () => changeWeek(1);
+
+// Keyboard navigation: left/right arrows change the week
+document.addEventListener("keydown", (e) => {
+  // ignore when focus is on an input, textarea or contenteditable
+  const tag = document.activeElement && document.activeElement.tagName;
+  const isInput =
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    document.activeElement.isContentEditable;
+  if (isInput) return;
+
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    changeWeek(-1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    changeWeek(1);
+  }
+});
 
 /* === Déconnexion === */
 // Déconnexion — version robuste avec feedback utilisateur
