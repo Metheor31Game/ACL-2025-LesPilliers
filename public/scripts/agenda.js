@@ -181,6 +181,18 @@ function ouvrirModal(date) {
   document.getElementById("modalTitle").textContent = "Nouveau RDV";
   document.getElementById("titre").value = "";
   document.getElementById("desc").value = "";
+
+
+  // reset récurrence
+  const recurSelect = document.getElementById("recurrence");
+  if (recurSelect) recurSelect.value = "none";
+
+  // afficher date/plage
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = formatDateRange(selectedDate);
+  // masquer bouton supprimer
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) delBtn.classList.add("hidden");
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -266,18 +278,59 @@ function modifierRdv(rdv) {
   document.getElementById("modalTitle").textContent = "Modifier RDV";
   document.getElementById("titre").value = rdv.titre;
   document.getElementById("desc").value = rdv.description || "";
+
+  // renseigner la récurrence (par défaut "none" si pas définie)
+  const recurSelect = document.getElementById("recurrence");
+  if (recurSelect) {
+    recurSelect.value = rdv.recurrence || "none";
+  }
+
+  // afficher date/plage
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = formatDateRange(selectedDate);
+  // afficher bouton supprimer et lier
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) {
+    delBtn.classList.remove("hidden");
+    delBtn.onclick = async () => {
+      if (!rdvEnEdition) return;
+      // fermer modal puis supprimer
+      document.getElementById("modal").classList.add("hidden");
+      await supprimerRdv(rdvEnEdition._id);
+      rdvEnEdition = null;
+    };
+  }
   document.getElementById("modal").classList.remove("hidden");
 }
 
 /* === Navigation entre semaines === */
-document.getElementById("prevWeek").onclick = () => {
-  currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-  afficherSemaine();
-};
-document.getElementById("nextWeek").onclick = () => {
-  currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-  afficherSemaine();
-};
+function changeWeek(weeks) {
+  currentWeekStart.setDate(currentWeekStart.getDate() + weeks * 7);
+  // Important : recharger les RDVs de la nouvelle semaine
+  chargerAgendas();
+}
+
+document.getElementById("prevWeek").onclick = () => changeWeek(-1);
+document.getElementById("nextWeek").onclick = () => changeWeek(1);
+
+// Keyboard navigation: left/right arrows change the week
+document.addEventListener("keydown", (e) => {
+  // ignore when focus is on an input, textarea or contenteditable
+  const tag = document.activeElement && document.activeElement.tagName;
+  const isInput =
+    tag === "INPUT" ||
+    tag === "TEXTAREA" ||
+    document.activeElement.isContentEditable;
+  if (isInput) return;
+
+  if (e.key === "ArrowLeft") {
+    e.preventDefault();
+    changeWeek(-1);
+  } else if (e.key === "ArrowRight") {
+    e.preventDefault();
+    changeWeek(1);
+  }
+});
 
 /* === Déconnexion === */
 // Déconnexion — version robuste avec feedback utilisateur
