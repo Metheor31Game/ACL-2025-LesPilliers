@@ -1,3 +1,7 @@
+body {
+  padding: 10px;
+}
+
 .week-grid {
   display: grid;
   grid-template-columns: 80px repeat(7, 1fr);
@@ -16,6 +20,27 @@
   font-weight: 600;
   padding: 6px;
   border-bottom: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.week-header .day-num {
+  font-weight: 700;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.week-header .today {
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.06), transparent);
+  border-bottom: 2px solid rgba(37, 99, 235, 0.12);
+}
+
+.month-year {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
 }
 
 .hour-cell {
@@ -54,4 +79,113 @@
 }
 .notif-error {
   background-color: #dc2626; /* rouge */
+}
+
+/* Modal overlay and card */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 6, 23, 0.35);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  z-index: 60;
+}
+.modal-card {
+  background: #fff;
+  color: #0f172a;
+  width: min(520px, 92%);
+  padding: 1.25rem;
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(15, 23, 42, 0.04);
+}
+.modal-title {
+  font-size: 1.125rem;
+  margin: 0 0 0.5rem;
+  font-weight: 700;
+}
+.modal-date {
+  color: #6b7280;
+  font-size: 0.95rem;
+  margin-bottom: 0.75rem;
+}
+.modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.5rem;
+}
+
+/* Header and account area */
+.agenda-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.agenda-header .header-left {
+  flex: 1 1 auto;
+}
+.agenda-header .controls {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* center the arrows + month */
+  gap: 0.6rem;
+  width: 100%;
+}
+.month-wrap {
+  flex: none; /* do not expand: keep month tightly centered between arrows */
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 8px;
+  min-width: 140px;
+}
+.btn-arrow {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+  color: var(--text);
+  padding: 4px;
+}
+.btn-arrow:hover {
+  background: #eef2ff;
+  transform: translateY(-1px);
+}
+.month-year {
+  font-size: 1.05rem;
+  font-weight: 700;
+  text-align: center;
+}
+.btn-muted {
+  background: #eef2ff; /* subtle light */
+  color: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.btn-muted:hover {
+  background: #e6eeff;
+}
+.week-label {
+  min-width: 220px;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* Responsive tweak for the grid on small screens */
+@media (max-width: 700px) {
+  .week-grid {
+    grid-template-columns: 60px repeat(7, 1fr);
+  }
 }

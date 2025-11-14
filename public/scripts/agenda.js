@@ -4,6 +4,15 @@ let selectedDate = null;
 let currentWeekStart = getMonday(new Date());
 let rdvEnEdition = null;
 
+/* === Helpers === */
+function formatDateRange(d) {
+  if (!d) return "";
+  const dateStr = d.toLocaleDateString();
+  const startH = d.getHours();
+  const endH = startH + 1;
+  return `${dateStr} · ${startH}h - ${endH}h`;
+}
+
 /* === Notification visuelle === */
 function showNotif(message, type = "success") {
   const notif = document.getElementById("notif");
@@ -51,20 +60,51 @@ function afficherSemaine() {
   const container = document.getElementById("agendaContainer");
   container.innerHTML = "";
 
-  const header = document.createElement("div");
-  header.className = "week-grid week-header";
-  header.innerHTML =
-    "<div></div>" + jours.map((j) => `<div>${j}</div>`).join("");
-  container.appendChild(header);
-
-  const heures = Array.from({ length: 10 }, (_, i) => i + 8);
   const weekDates = Array.from(
     { length: 7 },
     (_, i) => new Date(currentWeekStart.getTime() + i * 86400000)
   );
-  document.getElementById(
-    "weekLabel"
-  ).textContent = `Semaine du ${weekDates[0].toLocaleDateString()} au ${weekDates[6].toLocaleDateString()}`;
+
+  const header = document.createElement("div");
+  header.className = "week-grid week-header";
+
+  // build header cells showing day name + date number (eg. "Lun 12")
+  const headerCells = ["<div></div>"];
+  weekDates.forEach((d, i) => {
+    const dayName = jours[i];
+    const dayNum = d.getDate();
+    const isToday = new Date().toDateString() === d.toDateString();
+    const cls = isToday ? "today" : "";
+    headerCells.push(
+      `<div class="${cls}">${dayName} <span class="day-num">${dayNum}</span></div>`
+    );
+  });
+  header.innerHTML = headerCells.join("");
+  container.appendChild(header);
+
+  const heures = Array.from({ length: 10 }, (_, i) => i + 8);
+  // update month/year display for the current week
+  const monthEl = document.getElementById("monthYear");
+  if (monthEl) {
+    const startMonth = weekDates[0].toLocaleDateString("fr-FR", {
+      month: "long",
+    });
+    const endMonth = weekDates[6].toLocaleDateString("fr-FR", {
+      month: "long",
+    });
+    const startYear = weekDates[0].getFullYear();
+    const endYear = weekDates[6].getFullYear();
+    let text = "";
+    if (startMonth === endMonth && startYear === endYear) {
+      text = `${startMonth} ${startYear}`;
+    } else if (startYear === endYear) {
+      text = `${startMonth} - ${endMonth} ${startYear}`;
+    } else {
+      text = `${startMonth} ${startYear} - ${endMonth} ${endYear}`;
+    }
+    // Capitalize first letter
+    monthEl.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+  }
 
   heures.forEach((h) => {
     const row = document.createElement("div");
@@ -124,11 +164,10 @@ function afficherRdvs(weekDates) {
       e.stopPropagation();
       modifierRdv(rdv);
     };
-    // clic droit → supprimer (stopPropagation pour éviter déclenchements parents)
+    // clic droit suppression retirée: suppression via le modal maintenant
     div.oncontextmenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (confirm("Supprimer ce rendez-vous ?")) supprimerRdv(rdv._id);
     };
 
     cell.appendChild(div);
@@ -142,18 +181,16 @@ function ouvrirModal(date) {
   document.getElementById("modalTitle").textContent = "Nouveau RDV";
   document.getElementById("titre").value = "";
   document.getElementById("desc").value = "";
-  // afficher date/plage
-  const info = document.getElementById("modalDateInfo");
-  if (info) info.textContent = formatDateRange(selectedDate);
-  // masquer bouton supprimer
-  const delBtn = document.getElementById("deleteRdv");
-  if (delBtn) delBtn.classList.add("hidden");
   document.getElementById("modal").classList.remove("hidden");
 }
 
 /* === Fermer la fenêtre === */
-document.getElementById("closeModal").onclick = () =>
+document.getElementById("closeModal").onclick = () => {
+  rdvEnEdition = null;
+  const info = document.getElementById("modalDateInfo");
+  if (info) info.textContent = "";
   document.getElementById("modal").classList.add("hidden");
+};
 
 /* === Enregistrer (ajout/modif) rdv-perm === */
 document.getElementById("saveRdv").onclick = async () => {
@@ -229,51 +266,18 @@ function modifierRdv(rdv) {
   document.getElementById("modalTitle").textContent = "Modifier RDV";
   document.getElementById("titre").value = rdv.titre;
   document.getElementById("desc").value = rdv.description || "";
-  // afficher date/plage
-  const info = document.getElementById("modalDateInfo");
-  if (info) info.textContent = formatDateRange(selectedDate);
-  // afficher bouton supprimer et lier
-  const delBtn = document.getElementById("deleteRdv");
-  if (delBtn) {
-    delBtn.classList.remove("hidden");
-    delBtn.onclick = async () => {
-      if (!rdvEnEdition) return;
-      // fermer modal puis supprimer
-      document.getElementById("modal").classList.add("hidden");
-      await supprimerRdv(rdvEnEdition._id);
-      rdvEnEdition = null;
-    };
-  }
   document.getElementById("modal").classList.remove("hidden");
 }
 
 /* === Navigation entre semaines === */
-function changeWeek(weeks) {
-  currentWeekStart.setDate(currentWeekStart.getDate() + weeks * 7);
+document.getElementById("prevWeek").onclick = () => {
+  currentWeekStart.setDate(currentWeekStart.getDate() - 7);
   afficherSemaine();
-}
-
-document.getElementById("prevWeek").onclick = () => changeWeek(-1);
-document.getElementById("nextWeek").onclick = () => changeWeek(1);
-
-// Keyboard navigation: left/right arrows change the week
-document.addEventListener("keydown", (e) => {
-  // ignore when focus is on an input, textarea or contenteditable
-  const tag = document.activeElement && document.activeElement.tagName;
-  const isInput =
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    document.activeElement.isContentEditable;
-  if (isInput) return;
-
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    changeWeek(-1);
-  } else if (e.key === "ArrowRight") {
-    e.preventDefault();
-    changeWeek(1);
-  }
-});
+};
+document.getElementById("nextWeek").onclick = () => {
+  currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  afficherSemaine();
+};
 
 /* === Déconnexion === */
 // Déconnexion — version robuste avec feedback utilisateur
@@ -305,12 +309,115 @@ if (logoutBtn) {
 }
 
 // Accès aux paramètres de compte (si bouton présent)
-const accSettingsBtn = document.getElementById("accSettingsBtn");
-if (accSettingsBtn) {
-  accSettingsBtn.addEventListener("click", () => {
-    window.location.href = "accSettings.html";
-  });
+// Ouvrir modal de modification du compte
+const accountBtn = document.getElementById("accountBtn");
+if (accountBtn) {
+  accountBtn.addEventListener("click", openAccountModal);
 }
 
+function openAccountModal() {
+  const modal = document.getElementById("accountModal");
+  if (!modal) return;
+  // préremplir le pseudo si disponible
+  try {
+    const name = localStorage.getItem("username");
+    const input = document.getElementById("accountUsername");
+    if (name && input) input.value = name;
+  } catch (e) {
+    /* ignore */
+  }
+  modal.classList.remove("hidden");
+}
+
+function closeAccountModal() {
+  const modal = document.getElementById("accountModal");
+  if (!modal) return;
+  modal.classList.add("hidden");
+}
+
+document.getElementById("closeAccountModal")?.addEventListener("click", () => {
+  closeAccountModal();
+});
+
+// Soumission du formulaire de modification du compte
+document.getElementById("saveAccount")?.addEventListener("click", async () => {
+  const username = document.getElementById("accountUsername")?.value?.trim();
+  const password =
+    document.getElementById("accountPassword")?.value || undefined;
+
+  if (!username && !password) {
+    showNotif("Renseignez un nouveau pseudo ou mot de passe", "error");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/auth/update", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        username: username || undefined,
+        password: password || undefined,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showNotif(data.message || "Erreur lors de la mise à jour", "error");
+      return;
+    }
+
+    // mise à jour ok: mettre à jour l'affichage et localStorage
+    if (username) {
+      try {
+        localStorage.setItem("username", username);
+      } catch (e) {
+        /* ignore */
+      }
+      const acctEl = document.getElementById("accountName");
+      if (acctEl) acctEl.textContent = username;
+    }
+
+    showNotif(data.message || "Compte mis à jour", "success");
+    closeAccountModal();
+  } catch (err) {
+    showNotif("Erreur réseau lors de la mise à jour", "error");
+  }
+});
+
 /* === Initialisation === */
+// afficher nom de compte si disponible (stocké après connexion)
+const acctEl = document.getElementById("accountName");
+if (acctEl) {
+  try {
+    const name = localStorage.getItem("username");
+    if (name) acctEl.textContent = name;
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+/* Password visibility toggles for any .pw-toggle buttons on this page (account modal) */
+(function initPwToggles() {
+  const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  const eyeOffSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.66 21.66 0 0 1 5.06-6.09"></path><path d="M1 1l22 22"></path></svg>`;
+
+  document.querySelectorAll(".pw-toggle").forEach((btn) => {
+    const targetId = btn.dataset.target;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    // ensure initial icon present
+    if (!btn.innerHTML.trim()) btn.innerHTML = eyeSvg;
+    btn.addEventListener("click", () => {
+      const isPwd = input.type === "password";
+      input.type = isPwd ? "text" : "password";
+      btn.innerHTML = isPwd ? eyeOffSvg : eyeSvg;
+      btn.setAttribute(
+        "aria-label",
+        isPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"
+      );
+    });
+  });
+})();
+
 chargerAgendas();
