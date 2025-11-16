@@ -43,7 +43,11 @@ async function chargerAgendas() {
   }
 
   agendaDefaut = agendas.find((a) => a.nom === "defaut") || agendas[0];
+  // stocker l'ID de l'agenda affiché pour export/import
+  window.currentAgendaId = agendaDefaut._id;
+  
   afficherSemaine();
+  
 }
 
 /* === Calcule le lundi de la semaine === */
@@ -271,7 +275,7 @@ async function supprimerRdv(rdvId) {
   }
 }
 
-/* === Modification d'un RDV  rdv-perm=== */
+/* === Modification d'un RDV  rdv-perm === */
 function modifierRdv(rdv) {
   rdvEnEdition = rdv;
   selectedDate = new Date(rdv.date);
@@ -472,5 +476,54 @@ if (acctEl) {
     });
   });
 })();
+
+// ---  U3 EXPORT ---
+document.getElementById("exportAgenda").addEventListener("click", async () => {
+  const agendaId = window.currentAgendaId; // récupère l'agenda affiché
+  if (!agendaId) return alert("Aucun agenda sélectionné");
+
+  const response = await fetch(`/api/agenda/${agendaId}/export`);
+  const blob = await response.blob();
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "agenda_export.json";
+  a.click();
+  window.URL.revokeObjectURL(url);
+});
+
+// --- U3 IMPORT ---
+document.getElementById("importAgenda").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const text = await file.text();
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch (err) {
+    alert("Fichier JSON invalide");
+    return;
+  }
+
+  const agendaId = window.currentAgendaId;
+  if (!agendaId) return alert("Aucun agenda sélectionné");
+
+  const res = await fetch(`/api/agenda/${agendaId}/import`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data)
+  });
+
+  if (res.ok) {
+    alert("Agenda importé !");
+    chargerAgendas(); // rafraîchir l'affichage
+  } else {
+    alert("Erreur lors de l'import");
+  }
+});
+
 
 chargerAgendas();

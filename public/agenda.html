@@ -109,6 +109,18 @@
         </div>
       </header>
 
+        <!-- U3 Import/Export buttons -->
+      <div class="flex gap-4 mb-4">
+        <button id="exportAgenda" class="bg-blue-500 text-white px-3 py-1 rounded">
+          Exporter l'agenda
+        </button>
+
+        <label class="bg-green-500 text-white px-3 py-1 rounded cursor-pointer">
+          Importer un agenda
+          <input type="file" id="importAgenda" class="hidden" accept="application/json" />
+        </label>
+      </div>
+
       <div id="agendaContainer" class="grid-container mb-6"></div>
 
       <div class="mt-4 actions-row">
@@ -194,7 +206,6 @@
         </form>
       </div>
     </div>
-
     <script src="/scripts/agenda.js"></script>
   </body>
 </html>

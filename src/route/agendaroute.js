@@ -145,6 +145,8 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   res.json({ message: "Rendez-vous supprimé" });
 });
 
+
+
 // --- MODIFICATION D'UN RDV ---
 router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   const { agendaId, rdvId } = req.params;
@@ -167,5 +169,68 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   await agenda.save();
   res.json({ message: "Rendez-vous modifié" });
 });
+
+// --- U3 EXPORTER un agenda ---
+router.get("/:agendaId/export", isAuthenticated, async (req, res) => {
+  const { agendaId } = req.params;
+
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId
+  });
+
+  if (!agenda) {
+    return res.status(404).json({ message: "Agenda introuvable" });
+  }
+
+  const exportData = {
+    name: agenda.nom,
+    rdvs: agenda.rdvs.map(r => ({
+      titre: r.titre,
+      description: r.description,
+      date: r.date,
+      recurrence: r.recurrence
+    }))
+  };
+
+  res.setHeader("Content-Disposition", `attachment; filename="${agenda.nom}.json"`);
+  res.setHeader("Content-Type", "application/json");
+
+  res.send(JSON.stringify(exportData, null, 2));
+});
+
+// --- U3 IMPORTER un agenda ---
+router.post("/:agendaId/import", isAuthenticated, async (req, res) => {
+  const { agendaId } = req.params;
+  const { rdvs } = req.body;
+
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId
+  });
+
+  if (!agenda) {
+    return res.status(404).json({ message: "Agenda introuvable" });
+  }
+
+  if (!Array.isArray(rdvs)) {
+    return res.status(400).json({ message: "Format d'import invalide" });
+  }
+
+  // Ajout des RDV importés
+  for (const r of rdvs) {
+    agenda.rdvs.push({
+      titre: r.titre,
+      description: r.description || "",
+      date: r.date,
+      recurrence: r.recurrence || "none"
+    });
+  }
+
+  await agenda.save();
+  res.json({ message: "Agenda importé avec succès" });
+});
+
+
 
 module.exports = router;
