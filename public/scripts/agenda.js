@@ -1,4 +1,5 @@
 // public/scripts/agenda.js
+// public/scripts/agenda.js
 
 // palette de couleurs (automatique)
 const colors = [
@@ -14,10 +15,14 @@ const colors = [
 let agendas = []; // tableaux d'agendas côté client
 let visibleAgendas = {}; // map agendaId -> bool visible
 let currentWeekStart = getMonday(new Date());
+let selectedDateForModal = null;
+let rdvEnEdition = null;
+window.currentAgendaId = null; // agenda utilisé pour import/export
 
-// notifications rapides
+// notifications rapides (compatible avec usages existants)
 function showNotif(text, type = "info", ms = 2200) {
   const n = document.getElementById("notif");
+  if (!n) return console.log(text);
   n.textContent = text;
   n.className = ""; // reset
   n.classList.add(
@@ -33,7 +38,7 @@ function showNotif(text, type = "info", ms = 2200) {
     "text-sm"
   );
   if (type === "ok") n.style.background = "#10b981";
-  else if (type === "err") n.style.background = "#ef4444";
+  else if (type === "err" || type === "error") n.style.background = "#ef4444";
   else n.style.background = "#3b82f6";
   n.classList.remove("hidden");
   setTimeout(() => n.classList.add("hidden"), ms);
@@ -74,6 +79,9 @@ async function chargerAgendas() {
       return chargerAgendas();
     }
 
+    // mettre un agenda courant pour import/export
+    window.currentAgendaId = window.currentAgendaId || agendas[0]._id;
+
     // initialiser visibleAgendas si besoin
     agendas.forEach((a) => {
       if (visibleAgendas[a._id] === undefined) visibleAgendas[a._id] = true;
@@ -103,7 +111,6 @@ function populateSelect() {
 
 // légende (couleurs, toggle visibilité, edit, delete)
 function afficherLegende() {
-  // Populate either the sidebar list (`#sidebarAgendaList`) or fallback `#legende`
   const leg =
     document.getElementById("sidebarAgendaList") ||
     document.getElementById("legende");
@@ -120,7 +127,6 @@ function afficherLegende() {
     checkbox.onchange = () => {
       visibleAgendas[a._id] = checkbox.checked;
       renderAgendaSemaine();
-      // if sidebar picker exists, also reflect in picker checkboxes
       const pickerCb = document.querySelector(
         `#agendaPickerList input[value='${a._id}']`
       );
@@ -153,34 +159,34 @@ function afficherLegende() {
     wrapper.appendChild(editBtn);
     wrapper.appendChild(delBtn);
 
+    // clicking the label sets currentAgendaId for import/export
+    label.onclick = () => {
+      window.currentAgendaId = a._id;
+    };
+
     leg.appendChild(wrapper);
   });
 }
 
-// ---- rendu grille hebdomadaire (simple colonne par jour) ----
+// ---- rendu grille hebdomadaire (avec support RDV récurrents weekly) ----
 function renderAgendaSemaine() {
   const container = document.getElementById("agendaContainer");
+  if (!container) return;
   container.innerHTML = "";
 
-  // days Monday..Sunday based on currentWeekStart
   const jours = Array.from({ length: 7 }).map((_, i) => {
     const d = new Date(currentWeekStart);
     d.setDate(currentWeekStart.getDate() + i);
-    // clear time part for comparisons
     d.setHours(0, 0, 0, 0);
     return d;
   });
 
-  // header row (uses .week-header layout: first cell reserved for hours)
   const header = document.createElement("div");
   header.className = "week-header";
-
-  // first empty header cell (hours column)
   const empty = document.createElement("div");
   empty.textContent = "";
   header.appendChild(empty);
 
-  // day headers
   jours.forEach((jour) => {
     const h = document.createElement("div");
     const dayName = document.createElement("span");
@@ -192,7 +198,6 @@ function renderAgendaSemaine() {
     dayNum.textContent = jour.getDate();
     h.appendChild(dayName);
     h.appendChild(dayNum);
-    // highlight today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (jour.getTime() === today.getTime()) h.classList.add("today");
@@ -201,25 +206,20 @@ function renderAgendaSemaine() {
 
   container.appendChild(header);
 
-  // build grid: left column hours, then 7 day cells per row
   const grid = document.createElement("div");
   grid.className = "week-grid";
 
-  // hour range (8h..20h) - adjust if you need full day
   const startHour = 8;
   const endHour = 20;
   for (let h = startHour; h <= endHour; h++) {
-    // hour label cell
     const hourCell = document.createElement("div");
     hourCell.className = "hour-cell";
     hourCell.textContent = `${String(h).padStart(2, "0")}h`;
     grid.appendChild(hourCell);
 
-    // one cell per day for this hour
     jours.forEach((jour) => {
       const dayCell = document.createElement("div");
       dayCell.className = "day-cell timeslot";
-      // data-datetime for click handlers (ISO string at hour)
       const dt = new Date(jour);
       dt.setHours(h, 0, 0, 0);
       dayCell.setAttribute("data-datetime", dt.toISOString());
@@ -230,21 +230,30 @@ function renderAgendaSemaine() {
         const color = colors[idx % colors.length];
         const rdvs = (agenda.rdvs || []).filter((r) => {
           const rdvDate = new Date(r.date);
-          return (
+          // exact match
+          const exact =
             rdvDate.getFullYear() === dt.getFullYear() &&
             rdvDate.getMonth() === dt.getMonth() &&
             rdvDate.getDate() === dt.getDate() &&
-            rdvDate.getHours() === dt.getHours()
-          );
+            rdvDate.getHours() === dt.getHours();
+          // weekly recurrence match (weekday + hour)
+          const weekly =
+            r.recurrence === "weekly" &&
+            rdvDate.getDay() === dt.getDay() &&
+            rdvDate.getHours() === dt.getHours();
+          return exact || weekly;
         });
         rdvs.forEach((rdv) => {
           const el = document.createElement("div");
           el.className = "rdv";
           el.style.background = color;
           el.title = `${agenda.nom} — ${rdv.titre}\n${rdv.description || ""}`;
+          const recurringLabel = rdv.recurrence === "weekly" ? " (perm.)" : "";
           el.innerHTML = `<strong>${
             rdv.titre
-          }</strong><div class="text-xs">${timeStr(rdv.date)}</div>`;
+          }${recurringLabel}</strong><div class=\"text-xs\">${timeStr(
+            rdv.date
+          )}</div>`;
           el.onclick = (ev) => {
             ev.stopPropagation();
             ouvrirEditionRdv(agenda, rdv);
@@ -259,7 +268,6 @@ function renderAgendaSemaine() {
 
   container.appendChild(grid);
 
-  // update monthYear display (centered between arrows)
   const monthEl = document.getElementById("monthYear");
   if (monthEl) {
     const start = jours[0];
@@ -277,7 +285,6 @@ function renderAgendaSemaine() {
     }
   }
 
-  // attach click handlers to timeslots
   attachGridSlotHandlers();
 }
 
@@ -302,8 +309,6 @@ async function creerAgenda(nom) {
     showNotif("Erreur création agenda", "err");
   }
 }
-
-// legacy: fallback RDV-creation removed (use modal).
 
 // renommer (prompt)
 async function renommerAgendaPrompt(agenda) {
@@ -364,6 +369,7 @@ function ouvrirEditionRdv(agenda, rdv) {
   titre.value = rdv.titre;
   desc.value = rdv.description || "";
   modal.classList.remove("hidden");
+  rdvEnEdition = rdv;
 
   // populate the agenda picker with agendas that already contain this RDV (by sharedId)
   try {
@@ -380,7 +386,6 @@ function ouvrirEditionRdv(agenda, rdv) {
         }
       });
     } else {
-      // default to current agenda only
       initial = [agenda._id];
     }
     populateAgendaPicker(initial);
@@ -388,12 +393,17 @@ function ouvrirEditionRdv(agenda, rdv) {
     populateAgendaPicker([agenda._id]);
   }
 
-  // on remplace l'action save pour faire un patch
+  // set recurrence select
+  const recur = document.getElementById("recurrence");
+  if (recur) recur.value = rdv.recurrence || "none";
+
+  // override save button for patch
   const saveBtn = document.getElementById("saveRdv");
   saveBtn.onclick = async () => {
     try {
       const newTitre = titre.value.trim();
       const newDesc = desc.value.trim();
+      const recurrence = document.getElementById("recurrence")?.value || "none";
       if (!newTitre) return showNotif("Titre requis", "err");
 
       // collect selected agendaIds from picker
@@ -414,6 +424,7 @@ function ouvrirEditionRdv(agenda, rdv) {
         body: JSON.stringify({
           titre: newTitre,
           description: newDesc,
+          recurrence,
           agendaIds,
         }),
       });
@@ -425,6 +436,7 @@ function ouvrirEditionRdv(agenda, rdv) {
       modal.classList.add("hidden");
       titre.value = "";
       desc.value = "";
+      rdvEnEdition = null;
       showNotif("RDV modifié", "ok");
       await chargerAgendas();
     } catch (err) {
@@ -438,17 +450,17 @@ function ouvrirEditionRdv(agenda, rdv) {
     modal.classList.add("hidden");
     titre.value = "";
     desc.value = "";
-    // restore default save action
+    rdvEnEdition = null;
     setDefaultSaveAction();
   };
-  // utiliser le bouton de suppression présent dans le modal (id="deleteRdv")
+
+  // delete button
   const delBtn = document.getElementById("deleteRdv");
   if (delBtn) {
     delBtn.classList.remove("hidden");
     delBtn.onclick = async () => {
       if (!confirm("Supprimer ce RDV ?")) return;
       try {
-        // collect selected agendaIds from picker (if none, default to current agenda)
         const picker = document.querySelectorAll(
           "#agendaPickerList input[type=checkbox]"
         );
@@ -478,6 +490,7 @@ function ouvrirEditionRdv(agenda, rdv) {
         modal.classList.add("hidden");
         titre.value = "";
         desc.value = "";
+        rdvEnEdition = null;
         showNotif("RDV supprimé", "ok");
         await chargerAgendas();
       } catch (err) {
@@ -491,12 +504,11 @@ function ouvrirEditionRdv(agenda, rdv) {
 // remettre l'action par défaut du modal (nouveau RDV)
 function setDefaultSaveAction() {
   const saveBtn = document.getElementById("saveRdv");
-  // hide delete button by default when creating new RDV
   const delBtn = document.getElementById("deleteRdv");
   if (delBtn) delBtn.classList.add("hidden");
-  // set modal title to new RDV when in default (create) mode
   const modalTitle = document.getElementById("modalTitle");
   if (modalTitle) modalTitle.textContent = "Nouveau RDV";
+  rdvEnEdition = null;
   saveBtn.onclick = async () => {
     // collect selected agendaIds from picker (if none, default to visible agendas)
     const picker = document.querySelectorAll(
@@ -516,16 +528,22 @@ function setDefaultSaveAction() {
 
     const titre = document.getElementById("titre").value.trim();
     const description = document.getElementById("desc").value.trim();
-    const date = selectedDateForModal; // variable set when opening modal for a timeslot
+    const date = selectedDateForModal;
+    const recurrence = document.getElementById("recurrence")?.value || "none";
     if (!titre || !date) return showNotif("Titre et heure requis", "err");
 
     try {
-      // use POST with agendaIds to create copies across selected agendas
       const res = await fetch(`/api/agenda/${agendaIds[0]}/rdv`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ titre, description, date, agendaIds }),
+        body: JSON.stringify({
+          titre,
+          description,
+          date,
+          agendaIds,
+          recurrence,
+        }),
       });
       if (!res.ok) {
         const err = await res.text();
@@ -556,7 +574,6 @@ function populateAgendaPicker(initialCheckedIds = []) {
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.value = id;
-    // default checked: if initialCheckedIds provided use it, otherwise check visible
     if (initialCheckedIds && initialCheckedIds.length > 0) {
       cb.checked = initialCheckedIds.includes(id);
     } else {
@@ -570,13 +587,13 @@ function populateAgendaPicker(initialCheckedIds = []) {
   });
 }
 
-// variable pour stocker date sélectionnée depuis calendrier
-let selectedDateForModal = null;
 function openModalForDate(date) {
   selectedDateForModal = date;
-  document.getElementById("modal").classList.remove("hidden");
-  // populate picker with visible agendas by default
+  const modal = document.getElementById("modal");
+  if (modal) modal.classList.remove("hidden");
   populateAgendaPicker();
+  const recur = document.getElementById("recurrence");
+  if (recur) recur.value = "none";
   setDefaultSaveAction();
 }
 
@@ -596,7 +613,7 @@ document.getElementById("btnAddAgenda")?.addEventListener("click", async () => {
   if (!nom) return showNotif("Nom obligatoire", "err");
   await creerAgenda(nom);
 });
-// legacy fallback removed: btnAddRdv listener omitted (RDV creation via modal)
+
 document.getElementById("logoutBtn")?.addEventListener("click", async () => {
   await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
   window.location.href = "connexion.html";
@@ -604,8 +621,6 @@ document.getElementById("logoutBtn")?.addEventListener("click", async () => {
 
 // Lorsqu'on clique sur une case horaire dans la grille, on ouvre le modal
 function attachGridSlotHandlers() {
-  // On parcourt toutes les colonnes et cellules et leur attache un handler si besoin.
-  // Ici on suppose que les cellules ont la classe .timeslot et un attribut data-datetime
   document.querySelectorAll(".timeslot").forEach((cell) => {
     cell.onclick = () => {
       const dt = cell.getAttribute("data-datetime");
@@ -617,13 +632,11 @@ function attachGridSlotHandlers() {
 
 /* Init UI: handlers for account modal and modal close/save defaults */
 function initUIHandlers() {
-  // account modal open
   const accountBtn = document.getElementById("accountBtn");
   const accountModal = document.getElementById("accountModal");
   const accountNameEl = document.getElementById("accountName");
   if (accountBtn && accountModal) {
     accountBtn.addEventListener("click", () => {
-      // prefill username from localStorage if available
       const stored = localStorage.getItem("username");
       const input = document.getElementById("accountUsername");
       if (input && stored) input.value = stored;
@@ -631,7 +644,6 @@ function initUIHandlers() {
     });
   }
 
-  // account modal close
   const closeAccount = document.getElementById("closeAccountModal");
   if (closeAccount && accountModal) {
     closeAccount.addEventListener("click", () => {
@@ -639,7 +651,6 @@ function initUIHandlers() {
     });
   }
 
-  // account save
   const saveAccount = document.getElementById("saveAccount");
   if (saveAccount) {
     saveAccount.addEventListener("click", async () => {
@@ -661,7 +672,6 @@ function initUIHandlers() {
           const txt = await res.text();
           return showNotif("Erreur mise à jour: " + txt, "err");
         }
-        // update UI
         if (data.username) {
           localStorage.setItem("username", data.username);
           if (accountNameEl) accountNameEl.textContent = data.username;
@@ -675,13 +685,11 @@ function initUIHandlers() {
     });
   }
 
-  // generic close for RDV modal (when creating new RDV)
   const closeModalBtn = document.getElementById("closeModal");
   if (closeModalBtn) {
     closeModalBtn.addEventListener("click", () => {
       const modal = document.getElementById("modal");
       if (modal) modal.classList.add("hidden");
-      // clear fields
       const titre = document.getElementById("titre");
       const desc = document.getElementById("desc");
       if (titre) titre.value = "";
@@ -690,16 +698,14 @@ function initUIHandlers() {
     });
   }
 
-  // agenda picker toggle
   const pickerToggle = document.getElementById("agendaPickerToggle");
   const picker = document.getElementById("agendaPicker");
   if (pickerToggle && picker) {
-    pickerToggle.addEventListener("click", () => {
-      picker.classList.toggle("hidden");
-    });
+    pickerToggle.addEventListener("click", () =>
+      picker.classList.toggle("hidden")
+    );
   }
 
-  // sidebar toggle + add-agenda
   const sidebar = document.getElementById("agendaSidebar");
   const sidebarToggle = document.getElementById("sidebarToggle");
   if (sidebar && sidebarToggle) {
@@ -710,18 +716,15 @@ function initUIHandlers() {
         sidebar.setAttribute("aria-hidden", "false");
         sidebarToggle.setAttribute("aria-expanded", "true");
         sidebarToggle.classList.add("open");
-        // visual state handled by CSS (.open class) — no inner text manipulation
       } else {
         sidebar.classList.add("closed");
         sidebar.setAttribute("aria-hidden", "true");
         sidebarToggle.setAttribute("aria-expanded", "false");
         sidebarToggle.classList.remove("open");
-        // visual state handled by CSS (.open class) — no inner text manipulation
       }
     });
   }
 
-  // sidebar add agenda
   const sidebarAdd = document.getElementById("sidebarBtnAddAgenda");
   if (sidebarAdd) {
     sidebarAdd.addEventListener("click", async () => {
@@ -735,10 +738,74 @@ function initUIHandlers() {
   }
 }
 
+// Password visibility toggles
+(function initPwToggles() {
+  const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  const eyeOffSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.66 21.66 0 0 1 5.06-6.09"></path><path d="M1 1l22 22"></path></svg>`;
+
+  document.querySelectorAll(".pw-toggle").forEach((btn) => {
+    const targetId = btn.dataset.target;
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    if (!btn.innerHTML.trim()) btn.innerHTML = eyeSvg;
+    btn.addEventListener("click", () => {
+      const isPwd = input.type === "password";
+      input.type = isPwd ? "text" : "password";
+      btn.innerHTML = isPwd ? eyeOffSvg : eyeSvg;
+      btn.setAttribute(
+        "aria-label",
+        isPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"
+      );
+    });
+  });
+})();
+
+// --- EXPORT / IMPORT ---
+document.getElementById("exportAgenda")?.addEventListener("click", async () => {
+  const agendaId = window.currentAgendaId;
+  if (!agendaId) return alert("Aucun agenda sélectionné");
+  const response = await fetch(`/api/agenda/${agendaId}/export`);
+  if (!response.ok) return alert("Erreur export");
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "agenda_export.json";
+  a.click();
+  window.URL.revokeObjectURL(url);
+});
+
+document
+  .getElementById("importAgenda")
+  ?.addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const text = await file.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch (err) {
+      alert("Fichier JSON invalide");
+      return;
+    }
+    const agendaId = window.currentAgendaId;
+    if (!agendaId) return alert("Aucun agenda sélectionné");
+    const res = await fetch(`/api/agenda/${agendaId}/import`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+      credentials: "include",
+    });
+    if (res.ok) {
+      alert("Agenda importé !");
+      chargerAgendas();
+    } else {
+      alert("Erreur lors de l'import");
+    }
+  });
+
 // initialisation
 setTimeout(() => {
-  // si tu n'as pas de select/inputs remplace par tes propres éléments HTML
   chargerAgendas();
-  // init UI handlers
   initUIHandlers();
 }, 50);

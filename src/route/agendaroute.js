@@ -18,12 +18,91 @@ const isAuthenticated = require("../middleware/auth");
 
 // list agendas for current user
 router.get("/", isAuthenticated, async (req, res) => {
-  try {
-    const agendas = await Agenda.find({ userId: req.session.userId });
-    res.json(agendas);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+  const agendas = await Agenda.find({ userId: req.session.userId });
+
+  // Récupération de la semaine envoyée par le frontend
+  const weekParam = req.query.week;
+  const startOfWeek = weekParam ? new Date(weekParam) : new Date();
+
+  // Forcer lundi 00:00
+  const day = startOfWeek.getDay();
+  const monday = new Date(startOfWeek);
+  monday.setDate(startOfWeek.getDate() - (day === 0 ? 6 : day - 1));
+  monday.setHours(0, 0, 0, 0);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+
+  const result = agendas.map((agenda) => {
+    const a = agenda.toObject();
+    const generated = [];
+
+    for (const rdv of agenda.rdvs) {
+      const original = new Date(rdv.date);
+
+      /* === RDV HEBDOMADAIRE === */
+      if (rdv.recurrence === "weekly") {
+        const originalDow = (original.getDay() + 6) % 7;
+
+        const clone = new Date(monday);
+        clone.setDate(monday.getDate() + originalDow);
+        clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
+
+        if (clone >= monday && clone <= sunday) {
+          generated.push({
+            ...rdv.toObject(),
+            date: clone,
+            _id: rdv._id,
+          });
+        }
+      } else if (rdv.recurrence === "monthly") {
+
+      /* === RDV MENSUEL === */
+        // On génère le RDV si le jour du mois correspond
+        const clone = new Date(monday);
+        clone.setDate(original.getDate());
+        clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
+
+        // Et on remet le bon mois/année de la semaine affichée
+        clone.setMonth(monday.getMonth());
+        clone.setFullYear(monday.getFullYear());
+
+        if (clone >= monday && clone <= sunday) {
+          generated.push({
+            ...rdv.toObject(),
+            date: clone,
+            _id: rdv._id,
+          });
+        }
+      } else if (rdv.recurrence === "yearly") {
+
+      /* === RDV ANNUEL === */
+        const clone = new Date(
+          monday.getFullYear(),
+          original.getMonth(),
+          original.getDate(),
+          original.getHours(),
+          original.getMinutes(),
+          0,
+          0
+        );
+
+        if (clone >= monday && clone <= sunday) {
+          generated.push({
+            ...rdv.toObject(),
+            date: clone,
+            _id: rdv._id,
+          });
+        }
+      }
+    }
+
+    a.rdvs = [...agenda.rdvs, ...generated];
+    return a;
+  });
+
+  res.json(result);
 });
 
 // create a new agenda
@@ -72,172 +151,142 @@ router.delete("/:agendaId", isAuthenticated, async (req, res) => {
   }
 });
 
-// create a RDV in an agenda (optionally propagate to multiple agendas)
+// --- AJOUT D'UN RDV perm ---
 router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
-  // body: { titre, date, description, agendaIds? }
-  try {
-    const { titre, date, description, agendaIds } = req.body;
-    const agenda = await Agenda.findOne({
-      _id: req.params.agendaId,
-      userId: req.session.userId,
-    });
-    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+  // modification pour RDV perm
+  const { titre, date, description, recurrence } = req.body;
+  const agenda = await Agenda.findOne({
+    _id: req.params.agendaId,
+    userId: req.session.userId,
+  });
 
-    const sharedId = new mongoose.Types.ObjectId();
-    const rdv = { titre, date, description, sharedId };
-    agenda.rdvs.push(rdv);
-    await agenda.save();
+  if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
 
-    // if agendaIds provided, add copies to those agendas (only agendas belonging to user)
-    if (Array.isArray(agendaIds) && agendaIds.length > 0) {
-      const uniqueIds = [...new Set(agendaIds.map((x) => x.toString()))];
-      for (const aid of uniqueIds) {
-        if (aid === req.params.agendaId) continue; // already created
-        const a = await Agenda.findOne({
-          _id: aid,
-          userId: req.session.userId,
-        });
-        if (!a) continue;
-        a.rdvs.push({ titre, date, description, sharedId });
-        await a.save();
-      }
-    }
+  /* modification pour RDV perm */
+  agenda.rdvs.push({
+    titre,
+    date,
+    description,
+    recurrence: recurrence || "none",
+  });
 
-    // return the RDV as stored inside the main agenda (last element)
-    const created = agenda.rdvs[agenda.rdvs.length - 1];
-    res.status(201).json(created);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+  await agenda.save();
+  res.status(201).json(agenda);
 });
 
-// update a RDV in an agenda and optionally synchronize presence across agendas
-router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
-  // body: { titre?, date?, description?, agendaIds? }
-  try {
-    const { titre, date, description, agendaIds } = req.body;
-    const agenda = await Agenda.findOne({
-      _id: req.params.agendaId,
-      userId: req.session.userId,
-    });
-    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
-
-    const rdv = agenda.rdvs.id(req.params.rdvId);
-    if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
-
-    if (titre !== undefined) rdv.titre = titre;
-    if (date !== undefined) rdv.date = date;
-    if (description !== undefined) rdv.description = description;
-
-    // ensure sharedId exists for synchronization
-    let sharedId = rdv.sharedId;
-    if (!sharedId) {
-      sharedId = new mongoose.Types.ObjectId();
-      rdv.sharedId = sharedId;
-    }
-
-    await agenda.save();
-
-    // synchronize presence across agendas if agendaIds provided
-    if (Array.isArray(agendaIds)) {
-      const desired = new Set(agendaIds.map((x) => x.toString()));
-      // find all agendas of this user that mention this sharedId
-      const allUserAgendas = await Agenda.find({ userId: req.session.userId });
-      for (const a of allUserAgendas) {
-        const has = a.rdvs.some(
-          (r) => r.sharedId && r.sharedId.toString() === sharedId.toString()
-        );
-        const should = desired.has(a._id.toString());
-        if (has && !should) {
-          a.rdvs = a.rdvs.filter(
-            (r) =>
-              !(r.sharedId && r.sharedId.toString() === sharedId.toString())
-          );
-          await a.save();
-        } else if (!has && should) {
-          a.rdvs.push({
-            titre: rdv.titre,
-            date: rdv.date,
-            description: rdv.description,
-            sharedId,
-          });
-          await a.save();
-        } else if (has && should) {
-          // update copies to reflect edits
-          let updated = false;
-          for (const r of a.rdvs) {
-            if (r.sharedId && r.sharedId.toString() === sharedId.toString()) {
-              r.titre = rdv.titre;
-              r.date = rdv.date;
-              r.description = rdv.description;
-              updated = true;
-            }
-          }
-          if (updated) await a.save();
-        }
-      }
-    }
-
-    res.json(rdv);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// delete RDV copies across multiple agendas
-router.post("/rdv/delete", isAuthenticated, async (req, res) => {
-  // body: { agendaIds: [..], sharedId?, rdvId? }
-  try {
-    const { agendaIds, sharedId, rdvId } = req.body;
-    if (!Array.isArray(agendaIds) || agendaIds.length === 0) {
-      return res.status(400).json({ message: "agendaIds requis" });
-    }
-    let removed = 0;
-    for (const aid of agendaIds) {
-      try {
-        const a = await Agenda.findOne({
-          _id: aid,
-          userId: req.session.userId,
-        });
-        if (!a) continue;
-        const before = a.rdvs.length;
-        if (sharedId) {
-          a.rdvs = a.rdvs.filter(
-            (r) => !(r.sharedId && r.sharedId.toString() === sharedId)
-          );
-        } else if (rdvId) {
-          a.rdvs = a.rdvs.filter((r) => r._id.toString() !== rdvId);
-        }
-        if (a.rdvs.length !== before) {
-          removed += before - a.rdvs.length;
-          await a.save();
-        }
-      } catch (e) {
-        continue; // ignore single agenda errors
-      }
-    }
-    res.json({ message: "Suppression effectuée", removed });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// delete single RDV from one agenda
 router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
-  try {
-    const agenda = await Agenda.findOne({
-      _id: req.params.agendaId,
-      userId: req.session.userId,
-    });
-    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
-    agenda.rdvs = agenda.rdvs.filter(
-      (r) => r._id.toString() !== req.params.rdvId
-    );
-    await agenda.save();
-    res.json({ message: "RDV supprimé" });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
+  const { agendaId, rdvId } = req.params;
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId,
+  });
+
+  if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+
+  const rdv = agenda.rdvs.id(req.params.rdvId);
+  if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
+
+  if (titre !== undefined) rdv.titre = titre;
+  if (date !== undefined) rdv.date = date;
+  if (description !== undefined) rdv.description = description;
+
+  // ensure sharedId exists for synchronization
+  let sharedId = rdv.sharedId;
+  if (!sharedId) {
+    sharedId = new mongoose.Types.ObjectId();
+    rdv.sharedId = sharedId;
   }
+
+  await agenda.save();
+
+  res.json({ message: "Rendez-vous supprimé" });
+});
+
+// --- MODIFICATION D'UN RDV ---
+router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
+  const { agendaId, rdvId } = req.params;
+  const { titre, description, date, recurrence } = req.body;
+
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId,
+  });
+  if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+
+  const rdv = agenda.rdvs.id(rdvId);
+  if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
+
+  if (titre) rdv.titre = titre;
+  if (description) rdv.description = description;
+  if (date) rdv.date = date;
+  if (recurrence) rdv.recurrence = recurrence;
+
+  await agenda.save();
+  res.json({ message: "Rendez-vous modifié" });
+});
+
+// --- U3 EXPORTER un agenda ---
+router.get("/:agendaId/export", isAuthenticated, async (req, res) => {
+  const { agendaId } = req.params;
+
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId,
+  });
+
+  if (!agenda) {
+    return res.status(404).json({ message: "Agenda introuvable" });
+  }
+
+  const exportData = {
+    name: agenda.nom,
+    rdvs: agenda.rdvs.map((r) => ({
+      titre: r.titre,
+      description: r.description,
+      date: r.date,
+      recurrence: r.recurrence,
+    })),
+  };
+
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename="${agenda.nom}.json"`
+  );
+  res.setHeader("Content-Type", "application/json");
+
+  res.send(JSON.stringify(exportData, null, 2));
+});
+
+// --- U3 IMPORTER un agenda ---
+router.post("/:agendaId/import", isAuthenticated, async (req, res) => {
+  const { agendaId } = req.params;
+  const { rdvs } = req.body;
+
+  const agenda = await Agenda.findOne({
+    _id: agendaId,
+    userId: req.session.userId,
+  });
+
+  if (!agenda) {
+    return res.status(404).json({ message: "Agenda introuvable" });
+  }
+
+  if (!Array.isArray(rdvs)) {
+    return res.status(400).json({ message: "Format d'import invalide" });
+  }
+
+  // Ajout des RDV importés
+  for (const r of rdvs) {
+    agenda.rdvs.push({
+      titre: r.titre,
+      description: r.description || "",
+      date: r.date,
+      recurrence: r.recurrence || "none",
+    });
+  }
+
+  await agenda.save();
+  res.json({ message: "Agenda importé avec succès" });
 });
 
 module.exports = router;

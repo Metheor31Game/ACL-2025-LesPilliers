@@ -4,7 +4,13 @@ const rdvSchema = new mongoose.Schema({
   titre: { type: String, required: true },
   date: { type: Date, required: true },
   description: { type: String },
-  sharedId: { type: mongoose.Schema.Types.ObjectId, default: null },
+
+  // Ajout pour RDV permanents
+  recurrence: {
+    type: String,
+    enum: ["none", "weekly", "monthly", "yearly"],
+    default: "none",
+  },
 });
 
-module.exports = rdvSchema; // Export en sous-schéma, pas un modèle complet
+module.exports = rdvSchema;

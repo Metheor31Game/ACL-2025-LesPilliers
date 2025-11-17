@@ -150,6 +150,22 @@
         </aside>
 
         <main class="agenda-main">
+          <div class="flex gap-4 mb-4">
+            <button id="exportAgenda" class="btn btn-primary">
+              Exporter l'agenda
+            </button>
+
+            <label class="btn btn-muted cursor-pointer">
+              Importer un agenda
+              <input
+                type="file"
+                id="importAgenda"
+                class="hidden"
+                accept="application/json"
+              />
+            </label>
+          </div>
+
           <div id="agendaContainer" class="grid-container mb-6"></div>
 
           <div class="mt-4 actions-row">
@@ -180,6 +196,14 @@
           class="input mb-3"
           rows="4"
         ></textarea>
+        <!-- Nouveau : choix de la récurrence -->
+        <label for="recurrence" class="note">Récurrence</label>
+        <select id="recurrence" class="input mb-3">
+          <option value="none">Aucune</option>
+          <option value="weekly">Hebdomadaire</option>
+          <option value="monthly">Mensuel</option>
+          <option value="yearly">Annuel</option>
+        </select>
 
         <!-- Agenda picker: affiche la liste des agendas pour choisir où créer/afficher le RDV -->
         <div class="agenda-picker mb-3">
@@ -248,7 +272,6 @@
         </form>
       </div>
     </div>
-
     <script src="/scripts/agenda.js"></script>
   </body>
 </html>
