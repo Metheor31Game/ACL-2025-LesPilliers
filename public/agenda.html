@@ -17,7 +17,7 @@
       <!-- Header: title + account area -->
       <header class="agenda-header mb-4">
         <div class="header-left">
-          <h1 class="text-2xl font-bold">Mon Agenda - Vue Hebdomadaire</h1>
+          <h1 class="text-2xl font-bold">Mon Agenda</h1>
           <div class="controls mt-3">
             <button
               id="prevWeek"
@@ -109,13 +109,61 @@
         </div>
       </header>
 
-      <div id="agendaContainer" class="grid-container mb-6"></div>
+      <div class="agenda-body">
+        <!-- Sidebar (closed by default) -->
+        <aside
+          id="agendaSidebar"
+          class="agenda-sidebar closed"
+          aria-hidden="true"
+        >
+          <button
+            id="sidebarToggle"
+            class="sidebar-tab"
+            aria-label="Ouvrir la liste des agendas"
+            aria-expanded="false"
+          >
+            <span class="hamburger" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </span>
+            <span class="tab-label sr-only">Agendas</span>
+          </button>
+          <div class="sidebar-content">
+            <h3 class="mb-sm">Agendas</h3>
+            <div id="sidebarAgendaList" class="mb-sm"></div>
 
-      <div class="mt-4 actions-row">
-        <button id="logoutBtn" class="btn-danger">Déconnexion</button>
+            <div class="mt-sm">
+              <label for="sidebarAgendaName" class="note"
+                >Ajouter un agenda</label
+              >
+              <input
+                id="sidebarAgendaName"
+                class="input mb-2"
+                placeholder="Nom de l'agenda"
+              />
+              <button id="sidebarBtnAddAgenda" class="btn btn-primary">
+                Ajouter
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="agenda-main">
+          <div id="agendaContainer" class="grid-container mb-6"></div>
+
+          <div class="mt-4 actions-row">
+            <button id="logoutBtn" class="btn-danger">Déconnexion</button>
+          </div>
+        </main>
       </div>
     </div>
+    <!-- legacy legend and add-agenda moved into the sidebar -->
 
+    <!-- (Sélecteur d'agenda retiré — le RDV est créé dans le premier agenda visible) -->
+
+    <!-- Calendrier : conteneur -->
+    <!-- NOTE: agendaContainer and notif are declared above; duplicates removed -->
     <!-- Modal ajout/modif RDV -->
     <div id="modal" class="fixed inset-0 modal-overlay hidden">
       <div class="modal-card">
@@ -132,6 +180,20 @@
           class="input mb-3"
           rows="4"
         ></textarea>
+
+        <!-- Agenda picker: affiche la liste des agendas pour choisir où créer/afficher le RDV -->
+        <div class="agenda-picker mb-3">
+          <button type="button" id="agendaPickerToggle" class="btn-muted">
+            Agendas
+          </button>
+          <div
+            id="agendaPicker"
+            class="card mt-sm hidden"
+            style="max-height: 200px; overflow: auto"
+          >
+            <div id="agendaPickerList" class="agenda-picker-list p-2"></div>
+          </div>
+        </div>
 
         <div class="modal-actions">
           <button id="saveRdv" class="btn btn-primary">Enregistrer</button>

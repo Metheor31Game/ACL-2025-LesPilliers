@@ -1,20 +1,14 @@
 /**
- * Agenda routes
- * - GET  /api/agenda/               -> list user's agendas
- * - POST /api/agenda/               -> create agenda
- * - PATCH/DELETE /api/agenda/:agendaId -> rename / delete agenda
- * - POST  /api/agenda/:agendaId/rdv  -> create RDV (supports multi-agenda via agendaIds)
- * - PATCH /api/agenda/:agendaId/rdv/:rdvId -> update RDV (supports sync across agendas)
- * - DELETE /api/agenda/:agendaId/rdv/:rdvId -> delete single RDV from one agenda
- * - POST /api/agenda/rdv/delete     -> delete RDV copies across multiple agendas
+ * Agenda routes (root-level route folder)
  */
 
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
 
-const Agenda = require("../model/Agenda");
-const isAuthenticated = require("../middleware/auth");
+const Agenda = require("../src/model/Agenda") || require("../model/Agenda");
+const isAuthenticated =
+  require("../src/middleware/auth") || require("../middleware/auth");
 
 // list agendas for current user
 router.get("/", isAuthenticated, async (req, res) => {
@@ -74,7 +68,6 @@ router.delete("/:agendaId", isAuthenticated, async (req, res) => {
 
 // create a RDV in an agenda (optionally propagate to multiple agendas)
 router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
-  // body: { titre, date, description, agendaIds? }
   try {
     const { titre, date, description, agendaIds } = req.body;
     const agenda = await Agenda.findOne({
@@ -88,11 +81,10 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
     agenda.rdvs.push(rdv);
     await agenda.save();
 
-    // if agendaIds provided, add copies to those agendas (only agendas belonging to user)
     if (Array.isArray(agendaIds) && agendaIds.length > 0) {
       const uniqueIds = [...new Set(agendaIds.map((x) => x.toString()))];
       for (const aid of uniqueIds) {
-        if (aid === req.params.agendaId) continue; // already created
+        if (aid === req.params.agendaId) continue;
         const a = await Agenda.findOne({
           _id: aid,
           userId: req.session.userId,
@@ -103,7 +95,6 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
       }
     }
 
-    // return the RDV as stored inside the main agenda (last element)
     const created = agenda.rdvs[agenda.rdvs.length - 1];
     res.status(201).json(created);
   } catch (err) {
@@ -113,7 +104,6 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
 
 // update a RDV in an agenda and optionally synchronize presence across agendas
 router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
-  // body: { titre?, date?, description?, agendaIds? }
   try {
     const { titre, date, description, agendaIds } = req.body;
     const agenda = await Agenda.findOne({
@@ -129,7 +119,6 @@ router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
     if (date !== undefined) rdv.date = date;
     if (description !== undefined) rdv.description = description;
 
-    // ensure sharedId exists for synchronization
     let sharedId = rdv.sharedId;
     if (!sharedId) {
       sharedId = new mongoose.Types.ObjectId();
@@ -138,10 +127,8 @@ router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
     await agenda.save();
 
-    // synchronize presence across agendas if agendaIds provided
     if (Array.isArray(agendaIds)) {
       const desired = new Set(agendaIds.map((x) => x.toString()));
-      // find all agendas of this user that mention this sharedId
       const allUserAgendas = await Agenda.find({ userId: req.session.userId });
       for (const a of allUserAgendas) {
         const has = a.rdvs.some(
@@ -163,7 +150,6 @@ router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
           });
           await a.save();
         } else if (has && should) {
-          // update copies to reflect edits
           let updated = false;
           for (const r of a.rdvs) {
             if (r.sharedId && r.sharedId.toString() === sharedId.toString()) {
@@ -186,7 +172,6 @@ router.patch("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
 // delete RDV copies across multiple agendas
 router.post("/rdv/delete", isAuthenticated, async (req, res) => {
-  // body: { agendaIds: [..], sharedId?, rdvId? }
   try {
     const { agendaIds, sharedId, rdvId } = req.body;
     if (!Array.isArray(agendaIds) || agendaIds.length === 0) {
@@ -213,7 +198,7 @@ router.post("/rdv/delete", isAuthenticated, async (req, res) => {
           await a.save();
         }
       } catch (e) {
-        continue; // ignore single agenda errors
+        continue;
       }
     }
     res.json({ message: "Suppression effectuée", removed });

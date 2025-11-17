@@ -1,444 +1,744 @@
-let agendas = [];
-let agendaDefaut = null;
-let selectedDate = null;
+// public/scripts/agenda.js
+
+// palette de couleurs (automatique)
+const colors = [
+  "#3b82f6",
+  "#10b981",
+  "#f59e0b",
+  "#ef4444",
+  "#8b5cf6",
+  "#06b6d4",
+  "#84cc16",
+];
+
+let agendas = []; // tableaux d'agendas côté client
+let visibleAgendas = {}; // map agendaId -> bool visible
 let currentWeekStart = getMonday(new Date());
-let rdvEnEdition = null;
 
-/* === Helpers === */
-function formatDateRange(d) {
-  if (!d) return "";
-  const dateStr = d.toLocaleDateString();
-  const startH = d.getHours();
-  const endH = startH + 1;
-  return `${dateStr} · ${startH}h - ${endH}h`;
+// notifications rapides
+function showNotif(text, type = "info", ms = 2200) {
+  const n = document.getElementById("notif");
+  n.textContent = text;
+  n.className = ""; // reset
+  n.classList.add(
+    "fixed",
+    "top-4",
+    "left-1/2",
+    "-translate-x-1/2",
+    "px-4",
+    "py-2",
+    "rounded",
+    "shadow",
+    "text-white",
+    "text-sm"
+  );
+  if (type === "ok") n.style.background = "#10b981";
+  else if (type === "err") n.style.background = "#ef4444";
+  else n.style.background = "#3b82f6";
+  n.classList.remove("hidden");
+  setTimeout(() => n.classList.add("hidden"), ms);
 }
 
-/* === Notification visuelle === */
-function showNotif(message, type = "success") {
-  const notif = document.getElementById("notif");
-  notif.textContent = message;
-  notif.className = `fixed top-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded shadow text-white text-sm ${
-    type === "success" ? "notif-success" : "notif-error"
-  }`;
-  notif.classList.remove("hidden");
-  setTimeout(() => notif.classList.add("hidden"), 2500);
-}
-
-/* === Chargement des agendas === */
-async function chargerAgendas() {
-  const res = await fetch("/api/agenda", { credentials: "include" });
-  if (res.status === 401) return (window.location.href = "connexion.html");
-  agendas = await res.json();
-
-  if (!agendas.length) {
-    await fetch("/api/agenda", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nom: "defaut" }),
-    });
-    return chargerAgendas();
-  }
-
-  agendaDefaut = agendas.find((a) => a.nom === "defaut") || agendas[0];
-  afficherSemaine();
-}
-
-/* === Calcule le lundi de la semaine === */
+// ---- utilitaires date ----
 function getMonday(d) {
   d = new Date(d);
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   return new Date(d.setDate(diff));
 }
+function formatDayHeader(d) {
+  return d.toLocaleDateString("fr-FR", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+}
+function timeStr(d) {
+  return new Date(d).toLocaleTimeString("fr-FR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
-/* === Affiche la grille de la semaine === */
-function afficherSemaine() {
-  const jours = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+// ---- chargement / affichage ----
+async function chargerAgendas() {
+  try {
+    const res = await fetch("/api/agenda", { credentials: "include" });
+    if (res.status === 401) return (window.location.href = "connexion.html");
+    if (!res.ok) throw new Error("Erreur chargement agendas");
+    agendas = await res.json();
+
+    // si aucun agenda, on en crée un "defaut"
+    if (!agendas || agendas.length === 0) {
+      await creerAgenda("defaut");
+      return chargerAgendas();
+    }
+
+    // initialiser visibleAgendas si besoin
+    agendas.forEach((a) => {
+      if (visibleAgendas[a._id] === undefined) visibleAgendas[a._id] = true;
+    });
+
+    populateSelect();
+    afficherLegende();
+    renderAgendaSemaine();
+  } catch (err) {
+    console.error(err);
+    showNotif("Impossible de charger les agendas", "err");
+  }
+}
+
+// remplir la select utilisée pour choisir l'agenda lors de création de RDV
+function populateSelect() {
+  const sel = document.getElementById("selectAgenda");
+  if (!sel) return;
+  sel.innerHTML = "";
+  agendas.forEach((a, i) => {
+    const opt = document.createElement("option");
+    opt.value = a._id;
+    opt.textContent = a.nom;
+    sel.appendChild(opt);
+  });
+}
+
+// légende (couleurs, toggle visibilité, edit, delete)
+function afficherLegende() {
+  // Populate either the sidebar list (`#sidebarAgendaList`) or fallback `#legende`
+  const leg =
+    document.getElementById("sidebarAgendaList") ||
+    document.getElementById("legende");
+  if (!leg) return;
+  leg.innerHTML = "";
+  agendas.forEach((a, i) => {
+    const color = colors[i % colors.length];
+    const wrapper = document.createElement("div");
+    wrapper.className = "flex items-center gap-2";
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = visibleAgendas[a._id] !== false;
+    checkbox.onchange = () => {
+      visibleAgendas[a._id] = checkbox.checked;
+      renderAgendaSemaine();
+      // if sidebar picker exists, also reflect in picker checkboxes
+      const pickerCb = document.querySelector(
+        `#agendaPickerList input[value='${a._id}']`
+      );
+      if (pickerCb) pickerCb.checked = checkbox.checked;
+    };
+
+    const swatch = document.createElement("span");
+    swatch.style.background = color;
+    swatch.className = "w-4 h-4 rounded-full inline-block";
+
+    const label = document.createElement("span");
+    label.className = "font-medium ml-1 mr-2";
+    label.textContent = a.nom;
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "text-xs text-blue-600 ml-2";
+    editBtn.textContent = "✎";
+    editBtn.title = "Renommer";
+    editBtn.onclick = () => renommerAgendaPrompt(a);
+
+    const delBtn = document.createElement("button");
+    delBtn.className = "text-xs text-red-600 ml-1";
+    delBtn.textContent = "🗑";
+    delBtn.title = "Supprimer";
+    delBtn.onclick = () => supprimerAgendaConfirm(a);
+
+    wrapper.appendChild(checkbox);
+    wrapper.appendChild(swatch);
+    wrapper.appendChild(label);
+    wrapper.appendChild(editBtn);
+    wrapper.appendChild(delBtn);
+
+    leg.appendChild(wrapper);
+  });
+}
+
+// ---- rendu grille hebdomadaire (simple colonne par jour) ----
+function renderAgendaSemaine() {
   const container = document.getElementById("agendaContainer");
   container.innerHTML = "";
 
-  const weekDates = Array.from(
-    { length: 7 },
-    (_, i) => new Date(currentWeekStart.getTime() + i * 86400000)
-  );
-
-  const header = document.createElement("div");
-  header.className = "week-grid week-header";
-
-  // build header cells showing day name + date number (eg. "Lun 12")
-  const headerCells = ["<div></div>"];
-  weekDates.forEach((d, i) => {
-    const dayName = jours[i];
-    const dayNum = d.getDate();
-    const isToday = new Date().toDateString() === d.toDateString();
-    const cls = isToday ? "today" : "";
-    headerCells.push(
-      `<div class="${cls}">${dayName} <span class="day-num">${dayNum}</span></div>`
-    );
+  // days Monday..Sunday based on currentWeekStart
+  const jours = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date(currentWeekStart);
+    d.setDate(currentWeekStart.getDate() + i);
+    // clear time part for comparisons
+    d.setHours(0, 0, 0, 0);
+    return d;
   });
-  header.innerHTML = headerCells.join("");
+
+  // header row (uses .week-header layout: first cell reserved for hours)
+  const header = document.createElement("div");
+  header.className = "week-header";
+
+  // first empty header cell (hours column)
+  const empty = document.createElement("div");
+  empty.textContent = "";
+  header.appendChild(empty);
+
+  // day headers
+  jours.forEach((jour) => {
+    const h = document.createElement("div");
+    const dayName = document.createElement("span");
+    dayName.textContent = jour.toLocaleDateString("fr-FR", {
+      weekday: "short",
+    });
+    const dayNum = document.createElement("span");
+    dayNum.className = "day-num";
+    dayNum.textContent = jour.getDate();
+    h.appendChild(dayName);
+    h.appendChild(dayNum);
+    // highlight today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (jour.getTime() === today.getTime()) h.classList.add("today");
+    header.appendChild(h);
+  });
+
   container.appendChild(header);
 
-  const heures = Array.from({ length: 10 }, (_, i) => i + 8);
-  // update month/year display for the current week
+  // build grid: left column hours, then 7 day cells per row
+  const grid = document.createElement("div");
+  grid.className = "week-grid";
+
+  // hour range (8h..20h) - adjust if you need full day
+  const startHour = 8;
+  const endHour = 20;
+  for (let h = startHour; h <= endHour; h++) {
+    // hour label cell
+    const hourCell = document.createElement("div");
+    hourCell.className = "hour-cell";
+    hourCell.textContent = `${String(h).padStart(2, "0")}h`;
+    grid.appendChild(hourCell);
+
+    // one cell per day for this hour
+    jours.forEach((jour) => {
+      const dayCell = document.createElement("div");
+      dayCell.className = "day-cell timeslot";
+      // data-datetime for click handlers (ISO string at hour)
+      const dt = new Date(jour);
+      dt.setHours(h, 0, 0, 0);
+      dayCell.setAttribute("data-datetime", dt.toISOString());
+
+      // populate rdvs matching this day and hour
+      agendas.forEach((agenda, idx) => {
+        if (!visibleAgendas[agenda._id]) return;
+        const color = colors[idx % colors.length];
+        const rdvs = (agenda.rdvs || []).filter((r) => {
+          const rdvDate = new Date(r.date);
+          return (
+            rdvDate.getFullYear() === dt.getFullYear() &&
+            rdvDate.getMonth() === dt.getMonth() &&
+            rdvDate.getDate() === dt.getDate() &&
+            rdvDate.getHours() === dt.getHours()
+          );
+        });
+        rdvs.forEach((rdv) => {
+          const el = document.createElement("div");
+          el.className = "rdv";
+          el.style.background = color;
+          el.title = `${agenda.nom} — ${rdv.titre}\n${rdv.description || ""}`;
+          el.innerHTML = `<strong>${
+            rdv.titre
+          }</strong><div class="text-xs">${timeStr(rdv.date)}</div>`;
+          el.onclick = (ev) => {
+            ev.stopPropagation();
+            ouvrirEditionRdv(agenda, rdv);
+          };
+          dayCell.appendChild(el);
+        });
+      });
+
+      grid.appendChild(dayCell);
+    });
+  }
+
+  container.appendChild(grid);
+
+  // update monthYear display (centered between arrows)
   const monthEl = document.getElementById("monthYear");
   if (monthEl) {
-    const startMonth = weekDates[0].toLocaleDateString("fr-FR", {
-      month: "long",
-    });
-    const endMonth = weekDates[6].toLocaleDateString("fr-FR", {
-      month: "long",
-    });
-    const startYear = weekDates[0].getFullYear();
-    const endYear = weekDates[6].getFullYear();
-    let text = "";
-    if (startMonth === endMonth && startYear === endYear) {
-      text = `${startMonth} ${startYear}`;
-    } else if (startYear === endYear) {
-      text = `${startMonth} - ${endMonth} ${startYear}`;
+    const start = jours[0];
+    const end = jours[6];
+    const opts = { month: "long", year: "numeric" };
+    if (start.getMonth() === end.getMonth()) {
+      monthEl.textContent = start.toLocaleDateString("fr-FR", opts);
     } else {
-      text = `${startMonth} ${startYear} - ${endMonth} ${endYear}`;
+      monthEl.textContent = `${start.toLocaleDateString("fr-FR", {
+        month: "long",
+      })} - ${end.toLocaleDateString("fr-FR", {
+        month: "long",
+        year: "numeric",
+      })}`;
     }
-    // Capitalize first letter
-    monthEl.textContent = text.charAt(0).toUpperCase() + text.slice(1);
   }
 
-  heures.forEach((h) => {
-    const row = document.createElement("div");
-    row.className = "week-grid";
-    row.innerHTML = `<div class='hour-cell'>${h}h</div>`;
-    weekDates.forEach((day) => {
-      const cell = document.createElement("div");
-      cell.className = "day-cell";
-      const slotDate = new Date(day);
-      slotDate.setHours(h, 0, 0, 0);
-      cell.onclick = () => ouvrirModal(slotDate);
-      row.appendChild(cell);
-    });
-    container.appendChild(row);
-  });
-
-  afficherRdvs(weekDates);
+  // attach click handlers to timeslots
+  attachGridSlotHandlers();
 }
 
-/* === Affiche les rendez-vous === */
-function afficherRdvs(weekDates) {
-  if (!agendaDefaut) return;
-  // calculer borne de la semaine affichée (inclusif)
-  const weekStart = new Date(weekDates[0]);
-  weekStart.setHours(0, 0, 0, 0);
-  const weekEnd = new Date(weekDates[6]);
-  weekEnd.setHours(23, 59, 59, 999);
-
-  // parcourir les rdvs et n'afficher que ceux dont la date est dans la semaine
-  agendaDefaut.rdvs.forEach((rdv) => {
-    const date = new Date(rdv.date);
-
-    // ignorer les rdvs hors de la semaine affichée
-    if (date < weekStart || date > weekEnd) return;
-
-    const col = (date.getDay() + 6) % 7; // lundi=0
-    const row = date.getHours() - 8;
-    if (row < 0 || row >= 10 || col < 0 || col >= 7) return;
-
-    const grid = document.querySelectorAll(".week-grid")[row + 1];
-    if (!grid) return;
-    const cell = grid.children[col + 1];
-    if (!cell) return;
-
-    const div = document.createElement("div");
-    div.className = "rdv";
-    div.textContent = rdv.titre;
-    div.title = rdv.description || "";
-
-    // clic gauche → modifier (stopPropagation pour éviter que la cellule parent n'ouvre un nouveau RDV)
-    div.onclick = (e) => {
-      e.stopPropagation();
-      modifierRdv(rdv);
-    };
-    // clic droit suppression retirée: suppression via le modal maintenant
-    div.oncontextmenu = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-
-    cell.appendChild(div);
-  });
-}
-
-/* === Ouvre la fenêtre d'ajout/modif === */
-function ouvrirModal(date) {
-  rdvEnEdition = null;
-  selectedDate = date;
-  document.getElementById("modalTitle").textContent = "Nouveau RDV";
-  document.getElementById("titre").value = "";
-  document.getElementById("desc").value = "";
-  // afficher date/plage
-  const info = document.getElementById("modalDateInfo");
-  if (info) info.textContent = formatDateRange(selectedDate);
-  // masquer bouton supprimer
-  const delBtn = document.getElementById("deleteRdv");
-  if (delBtn) delBtn.classList.add("hidden");
-  document.getElementById("modal").classList.remove("hidden");
-}
-
-/* === Fermer la fenêtre === */
-document.getElementById("closeModal").onclick = () => {
-  rdvEnEdition = null;
-  const info = document.getElementById("modalDateInfo");
-  if (info) info.textContent = "";
-  document.getElementById("modal").classList.add("hidden");
-};
-
-/* === Enregistrer (ajout/modif) === */
-document.getElementById("saveRdv").onclick = async () => {
-  const titre = document.getElementById("titre").value.trim();
-  const description = document.getElementById("desc").value.trim();
-  if (!titre) return showNotif("Titre requis", "error");
-  if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
-
-  const url = rdvEnEdition
-    ? `/api/agenda/${agendaDefaut._id}/rdv/${rdvEnEdition._id}`
-    : `/api/agenda/${agendaDefaut._id}/rdv`;
-  const method = rdvEnEdition ? "PUT" : "POST";
-  const body = JSON.stringify({ titre, description, date: selectedDate });
-
+// ---- actions agenda ----
+async function creerAgenda(nom) {
   try {
-    const res = await fetch(url, {
-      method,
+    const res = await fetch("/api/agenda", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body,
+      body: JSON.stringify({ nom }),
     });
-
     if (!res.ok) {
       const err = await res.text();
-      return showNotif(err || "Erreur lors de l'enregistrement", "error");
+      showNotif("Erreur création agenda: " + err, "err");
+      return;
     }
-
-    document.getElementById("modal").classList.add("hidden");
-    showNotif(
-      rdvEnEdition ? "Rendez-vous modifié" : "Rendez-vous ajouté",
-      "success"
-    );
-    chargerAgendas();
-  } catch (e) {
-    showNotif("Erreur réseau lors de l'enregistrement", "error");
+    showNotif("Agenda créé", "ok");
+    await chargerAgendas();
+  } catch (err) {
+    console.error(err);
+    showNotif("Erreur création agenda", "err");
   }
-};
+}
 
-/* === Suppression d'un RDV === */
-async function supprimerRdv(rdvId) {
-  if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
+// legacy: fallback RDV-creation removed (use modal).
 
+// renommer (prompt)
+async function renommerAgendaPrompt(agenda) {
+  const nouveau = prompt("Nouveau nom pour l'agenda", agenda.nom);
+  if (!nouveau || nouveau.trim() === "" || nouveau.trim() === agenda.nom)
+    return;
   try {
-    const res = await fetch(`/api/agenda/${agendaDefaut._id}/rdv/${rdvId}`, {
+    const res = await fetch(`/api/agenda/${agenda._id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ nom: nouveau.trim() }),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      showNotif("Erreur renommage: " + err, "err");
+      return;
+    }
+    showNotif("Agenda renommé", "ok");
+    await chargerAgendas();
+  } catch (err) {
+    console.error(err);
+    showNotif("Erreur renommage", "err");
+  }
+}
+
+// suppression (confirm)
+async function supprimerAgendaConfirm(agenda) {
+  if (
+    !confirm(`Supprimer l'agenda "${agenda.nom}" ? Tous ses RDV seront perdus.`)
+  )
+    return;
+  try {
+    const res = await fetch(`/api/agenda/${agenda._id}`, {
       method: "DELETE",
       credentials: "include",
     });
     if (!res.ok) {
       const err = await res.text();
-      return showNotif(err || "Erreur lors de la suppression", "error");
+      showNotif("Erreur suppression: " + err, "err");
+      return;
     }
-    showNotif("Rendez-vous supprimé", "success");
-    chargerAgendas();
-  } catch (e) {
-    showNotif("Erreur réseau lors de la suppression", "error");
+    showNotif("Agenda supprimé", "ok");
+    await chargerAgendas();
+  } catch (err) {
+    console.error(err);
+    showNotif("Erreur suppression", "err");
   }
 }
 
-/* === Modification d'un RDV === */
-function modifierRdv(rdv) {
-  rdvEnEdition = rdv;
-  selectedDate = new Date(rdv.date);
-  document.getElementById("modalTitle").textContent = "Modifier RDV";
-  document.getElementById("titre").value = rdv.titre;
-  document.getElementById("desc").value = rdv.description || "";
-  // afficher date/plage
-  const info = document.getElementById("modalDateInfo");
-  if (info) info.textContent = formatDateRange(selectedDate);
-  // afficher bouton supprimer et lier
+// édition RDV : ouvrir modal prérempli + supprimer/sauvegarder
+function ouvrirEditionRdv(agenda, rdv) {
+  const modal = document.getElementById("modal");
+  const titre = document.getElementById("titre");
+  const desc = document.getElementById("desc");
+  const modalTitle = document.getElementById("modalTitle");
+  modalTitle.textContent = `Modifier: ${rdv.titre}`;
+  titre.value = rdv.titre;
+  desc.value = rdv.description || "";
+  modal.classList.remove("hidden");
+
+  // populate the agenda picker with agendas that already contain this RDV (by sharedId)
+  try {
+    let initial = [];
+    if (rdv.sharedId) {
+      const sid = rdv.sharedId.toString();
+      agendas.forEach((a) => {
+        if (
+          (a.rdvs || []).some(
+            (r) => r.sharedId && r.sharedId.toString() === sid
+          )
+        ) {
+          initial.push(a._id);
+        }
+      });
+    } else {
+      // default to current agenda only
+      initial = [agenda._id];
+    }
+    populateAgendaPicker(initial);
+  } catch (e) {
+    populateAgendaPicker([agenda._id]);
+  }
+
+  // on remplace l'action save pour faire un patch
+  const saveBtn = document.getElementById("saveRdv");
+  saveBtn.onclick = async () => {
+    try {
+      const newTitre = titre.value.trim();
+      const newDesc = desc.value.trim();
+      if (!newTitre) return showNotif("Titre requis", "err");
+
+      // collect selected agendaIds from picker
+      const picker = document.querySelectorAll(
+        "#agendaPickerList input[type=checkbox]"
+      );
+      let agendaIds = [];
+      if (picker && picker.length) {
+        agendaIds = Array.from(picker)
+          .filter((c) => c.checked)
+          .map((c) => c.value);
+      }
+
+      const res = await fetch(`/api/agenda/${agenda._id}/rdv/${rdv._id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          titre: newTitre,
+          description: newDesc,
+          agendaIds,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        showNotif("Erreur modification RDV: " + err, "err");
+        return;
+      }
+      modal.classList.add("hidden");
+      titre.value = "";
+      desc.value = "";
+      showNotif("RDV modifié", "ok");
+      await chargerAgendas();
+    } catch (err) {
+      console.error(err);
+      showNotif("Erreur modification RDV", "err");
+    }
+  };
+
+  // bouton annuler
+  document.getElementById("closeModal").onclick = () => {
+    modal.classList.add("hidden");
+    titre.value = "";
+    desc.value = "";
+    // restore default save action
+    setDefaultSaveAction();
+  };
+  // utiliser le bouton de suppression présent dans le modal (id="deleteRdv")
   const delBtn = document.getElementById("deleteRdv");
   if (delBtn) {
     delBtn.classList.remove("hidden");
     delBtn.onclick = async () => {
-      if (!rdvEnEdition) return;
-      // fermer modal puis supprimer
-      document.getElementById("modal").classList.add("hidden");
-      await supprimerRdv(rdvEnEdition._id);
-      rdvEnEdition = null;
+      if (!confirm("Supprimer ce RDV ?")) return;
+      try {
+        // collect selected agendaIds from picker (if none, default to current agenda)
+        const picker = document.querySelectorAll(
+          "#agendaPickerList input[type=checkbox]"
+        );
+        let agendaIds = [];
+        if (picker && picker.length) {
+          agendaIds = Array.from(picker)
+            .filter((c) => c.checked)
+            .map((c) => c.value);
+        }
+        if (!agendaIds || agendaIds.length === 0) agendaIds = [agenda._id];
+
+        const payload = { agendaIds };
+        if (rdv.sharedId) payload.sharedId = rdv.sharedId.toString();
+        else payload.rdvId = rdv._id;
+
+        const res = await fetch(`/api/agenda/rdv/delete`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const err = await res.text();
+          showNotif("Erreur suppression RDV: " + err, "err");
+          return;
+        }
+        modal.classList.add("hidden");
+        titre.value = "";
+        desc.value = "";
+        showNotif("RDV supprimé", "ok");
+        await chargerAgendas();
+      } catch (err) {
+        console.error(err);
+        showNotif("Erreur suppression RDV", "err");
+      }
     };
   }
-  document.getElementById("modal").classList.remove("hidden");
 }
 
-/* === Navigation entre semaines === */
-function changeWeek(weeks) {
-  currentWeekStart.setDate(currentWeekStart.getDate() + weeks * 7);
-  afficherSemaine();
-}
+// remettre l'action par défaut du modal (nouveau RDV)
+function setDefaultSaveAction() {
+  const saveBtn = document.getElementById("saveRdv");
+  // hide delete button by default when creating new RDV
+  const delBtn = document.getElementById("deleteRdv");
+  if (delBtn) delBtn.classList.add("hidden");
+  // set modal title to new RDV when in default (create) mode
+  const modalTitle = document.getElementById("modalTitle");
+  if (modalTitle) modalTitle.textContent = "Nouveau RDV";
+  saveBtn.onclick = async () => {
+    // collect selected agendaIds from picker (if none, default to visible agendas)
+    const picker = document.querySelectorAll(
+      "#agendaPickerList input[type=checkbox]"
+    );
+    let agendaIds = [];
+    if (picker && picker.length) {
+      agendaIds = Array.from(picker)
+        .filter((c) => c.checked)
+        .map((c) => c.value);
+    }
+    if (!agendaIds || agendaIds.length === 0) {
+      for (const a of agendas)
+        if (visibleAgendas[a._id] !== false) agendaIds.push(a._id);
+      if (agendaIds.length === 0 && agendas[0]) agendaIds.push(agendas[0]._id);
+    }
 
-document.getElementById("prevWeek").onclick = () => changeWeek(-1);
-document.getElementById("nextWeek").onclick = () => changeWeek(1);
+    const titre = document.getElementById("titre").value.trim();
+    const description = document.getElementById("desc").value.trim();
+    const date = selectedDateForModal; // variable set when opening modal for a timeslot
+    if (!titre || !date) return showNotif("Titre et heure requis", "err");
 
-// Keyboard navigation: left/right arrows change the week
-document.addEventListener("keydown", (e) => {
-  // ignore when focus is on an input, textarea or contenteditable
-  const tag = document.activeElement && document.activeElement.tagName;
-  const isInput =
-    tag === "INPUT" ||
-    tag === "TEXTAREA" ||
-    document.activeElement.isContentEditable;
-  if (isInput) return;
-
-  if (e.key === "ArrowLeft") {
-    e.preventDefault();
-    changeWeek(-1);
-  } else if (e.key === "ArrowRight") {
-    e.preventDefault();
-    changeWeek(1);
-  }
-});
-
-/* === Déconnexion === */
-// Déconnexion — version robuste avec feedback utilisateur
-const logoutBtn = document.getElementById("logoutBtn");
-if (logoutBtn) {
-  logoutBtn.addEventListener("click", async () => {
     try {
-      const res = await fetch("/api/auth/logout", {
+      // use POST with agendaIds to create copies across selected agendas
+      const res = await fetch(`/api/agenda/${agendaIds[0]}/rdv`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         credentials: "include",
+        body: JSON.stringify({ titre, description, date, agendaIds }),
       });
-
-      if (res.ok) {
-        alert("Déconnexion réussie !");
-        window.location.href = "connexion.html";
-      } else {
-        let error = {};
-        try {
-          error = await res.json();
-        } catch (e) {
-          /* ignore */
-        }
-        alert("Erreur : " + (error.message || "Déconnexion échouée"));
+      if (!res.ok) {
+        const err = await res.text();
+        showNotif("Erreur ajout RDV: " + err, "err");
+        return;
       }
+      document.getElementById("titre").value = "";
+      document.getElementById("desc").value = "";
+      document.getElementById("modal").classList.add("hidden");
+      showNotif("RDV ajouté", "ok");
+      await chargerAgendas();
     } catch (err) {
-      alert("Erreur réseau lors de la déconnexion");
+      console.error(err);
+      showNotif("Erreur ajout RDV", "err");
     }
+  };
+}
+
+// build/populate the agenda picker UI inside the modal
+function populateAgendaPicker(initialCheckedIds = []) {
+  const container = document.getElementById("agendaPickerList");
+  if (!container) return;
+  container.innerHTML = "";
+  agendas.forEach((a, idx) => {
+    const id = a._id;
+    const label = document.createElement("label");
+    label.className = "flex items-center gap-2";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.value = id;
+    // default checked: if initialCheckedIds provided use it, otherwise check visible
+    if (initialCheckedIds && initialCheckedIds.length > 0) {
+      cb.checked = initialCheckedIds.includes(id);
+    } else {
+      cb.checked = visibleAgendas[id] !== false;
+    }
+    const span = document.createElement("span");
+    span.textContent = a.nom;
+    label.appendChild(cb);
+    label.appendChild(span);
+    container.appendChild(label);
   });
 }
 
-// Accès aux paramètres de compte (si bouton présent)
-// Ouvrir modal de modification du compte
-const accountBtn = document.getElementById("accountBtn");
-if (accountBtn) {
-  accountBtn.addEventListener("click", openAccountModal);
+// variable pour stocker date sélectionnée depuis calendrier
+let selectedDateForModal = null;
+function openModalForDate(date) {
+  selectedDateForModal = date;
+  document.getElementById("modal").classList.remove("hidden");
+  // populate picker with visible agendas by default
+  populateAgendaPicker();
+  setDefaultSaveAction();
 }
 
-function openAccountModal() {
-  const modal = document.getElementById("accountModal");
-  if (!modal) return;
-  // préremplir le pseudo si disponible
-  try {
-    const name = localStorage.getItem("username");
-    const input = document.getElementById("accountUsername");
-    if (name && input) input.value = name;
-  } catch (e) {
-    /* ignore */
-  }
-  modal.classList.remove("hidden");
-}
-
-function closeAccountModal() {
-  const modal = document.getElementById("accountModal");
-  if (!modal) return;
-  modal.classList.add("hidden");
-}
-
-document.getElementById("closeAccountModal")?.addEventListener("click", () => {
-  closeAccountModal();
+// ---- navigation semaine ----
+document.getElementById("prevWeek")?.addEventListener("click", () => {
+  currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+  renderAgendaSemaine();
+});
+document.getElementById("nextWeek")?.addEventListener("click", () => {
+  currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+  renderAgendaSemaine();
 });
 
-// Soumission du formulaire de modification du compte
-document.getElementById("saveAccount")?.addEventListener("click", async () => {
-  const username = document.getElementById("accountUsername")?.value?.trim();
-  const password =
-    document.getElementById("accountPassword")?.value || undefined;
+// actions boutons statiques (ajout agenda, ajout rdv, logout)
+document.getElementById("btnAddAgenda")?.addEventListener("click", async () => {
+  const nom = document.getElementById("agendaNom").value.trim();
+  if (!nom) return showNotif("Nom obligatoire", "err");
+  await creerAgenda(nom);
+});
+// legacy fallback removed: btnAddRdv listener omitted (RDV creation via modal)
+document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+  window.location.href = "connexion.html";
+});
 
-  if (!username && !password) {
-    showNotif("Renseignez un nouveau pseudo ou mot de passe", "error");
-    return;
+// Lorsqu'on clique sur une case horaire dans la grille, on ouvre le modal
+function attachGridSlotHandlers() {
+  // On parcourt toutes les colonnes et cellules et leur attache un handler si besoin.
+  // Ici on suppose que les cellules ont la classe .timeslot et un attribut data-datetime
+  document.querySelectorAll(".timeslot").forEach((cell) => {
+    cell.onclick = () => {
+      const dt = cell.getAttribute("data-datetime");
+      if (!dt) return;
+      openModalForDate(dt);
+    };
+  });
+}
+
+/* Init UI: handlers for account modal and modal close/save defaults */
+function initUIHandlers() {
+  // account modal open
+  const accountBtn = document.getElementById("accountBtn");
+  const accountModal = document.getElementById("accountModal");
+  const accountNameEl = document.getElementById("accountName");
+  if (accountBtn && accountModal) {
+    accountBtn.addEventListener("click", () => {
+      // prefill username from localStorage if available
+      const stored = localStorage.getItem("username");
+      const input = document.getElementById("accountUsername");
+      if (input && stored) input.value = stored;
+      accountModal.classList.remove("hidden");
+    });
   }
 
-  try {
-    const res = await fetch("/api/auth/update", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        username: username || undefined,
-        password: password || undefined,
-      }),
+  // account modal close
+  const closeAccount = document.getElementById("closeAccountModal");
+  if (closeAccount && accountModal) {
+    closeAccount.addEventListener("click", () => {
+      accountModal.classList.add("hidden");
     });
+  }
 
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      showNotif(data.message || "Erreur lors de la mise à jour", "error");
-      return;
-    }
-
-    // mise à jour ok: mettre à jour l'affichage et localStorage
-    if (username) {
+  // account save
+  const saveAccount = document.getElementById("saveAccount");
+  if (saveAccount) {
+    saveAccount.addEventListener("click", async () => {
+      const input = document.getElementById("accountUsername");
+      const pass = document.getElementById("accountPassword");
+      const data = {};
+      if (input && input.value.trim()) data.username = input.value.trim();
+      if (pass && pass.value.trim()) data.password = pass.value.trim();
+      if (Object.keys(data).length === 0)
+        return showNotif("Rien à changer", "err");
       try {
-        localStorage.setItem("username", username);
-      } catch (e) {
-        /* ignore */
+        const res = await fetch("/api/auth/update", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify(data),
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          return showNotif("Erreur mise à jour: " + txt, "err");
+        }
+        // update UI
+        if (data.username) {
+          localStorage.setItem("username", data.username);
+          if (accountNameEl) accountNameEl.textContent = data.username;
+        }
+        accountModal.classList.add("hidden");
+        showNotif("Compte mis à jour", "ok");
+      } catch (err) {
+        console.error(err);
+        showNotif("Erreur mise à jour", "err");
       }
-      const acctEl = document.getElementById("accountName");
-      if (acctEl) acctEl.textContent = username;
-    }
-
-    showNotif(data.message || "Compte mis à jour", "success");
-    closeAccountModal();
-  } catch (err) {
-    showNotif("Erreur réseau lors de la mise à jour", "error");
+    });
   }
-});
 
-/* === Initialisation === */
-// afficher nom de compte si disponible (stocké après connexion)
-const acctEl = document.getElementById("accountName");
-if (acctEl) {
-  try {
-    const name = localStorage.getItem("username");
-    if (name) acctEl.textContent = name;
-  } catch (e) {
-    /* ignore */
+  // generic close for RDV modal (when creating new RDV)
+  const closeModalBtn = document.getElementById("closeModal");
+  if (closeModalBtn) {
+    closeModalBtn.addEventListener("click", () => {
+      const modal = document.getElementById("modal");
+      if (modal) modal.classList.add("hidden");
+      // clear fields
+      const titre = document.getElementById("titre");
+      const desc = document.getElementById("desc");
+      if (titre) titre.value = "";
+      if (desc) desc.value = "";
+      setDefaultSaveAction();
+    });
+  }
+
+  // agenda picker toggle
+  const pickerToggle = document.getElementById("agendaPickerToggle");
+  const picker = document.getElementById("agendaPicker");
+  if (pickerToggle && picker) {
+    pickerToggle.addEventListener("click", () => {
+      picker.classList.toggle("hidden");
+    });
+  }
+
+  // sidebar toggle + add-agenda
+  const sidebar = document.getElementById("agendaSidebar");
+  const sidebarToggle = document.getElementById("sidebarToggle");
+  if (sidebar && sidebarToggle) {
+    sidebarToggle.addEventListener("click", () => {
+      const open = sidebar.classList.toggle("open");
+      if (open) {
+        sidebar.classList.remove("closed");
+        sidebar.setAttribute("aria-hidden", "false");
+        sidebarToggle.setAttribute("aria-expanded", "true");
+        sidebarToggle.classList.add("open");
+        // visual state handled by CSS (.open class) — no inner text manipulation
+      } else {
+        sidebar.classList.add("closed");
+        sidebar.setAttribute("aria-hidden", "true");
+        sidebarToggle.setAttribute("aria-expanded", "false");
+        sidebarToggle.classList.remove("open");
+        // visual state handled by CSS (.open class) — no inner text manipulation
+      }
+    });
+  }
+
+  // sidebar add agenda
+  const sidebarAdd = document.getElementById("sidebarBtnAddAgenda");
+  if (sidebarAdd) {
+    sidebarAdd.addEventListener("click", async () => {
+      const input = document.getElementById("sidebarAgendaName");
+      if (!input) return;
+      const nom = input.value.trim();
+      if (!nom) return showNotif("Nom obligatoire", "err");
+      await creerAgenda(nom);
+      input.value = "";
+    });
   }
 }
 
-/* Password visibility toggles for any .pw-toggle buttons on this page (account modal) */
-(function initPwToggles() {
-  const eyeSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-  const eyeOffSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a21.66 21.66 0 0 1 5.06-6.09"></path><path d="M1 1l22 22"></path></svg>`;
-
-  document.querySelectorAll(".pw-toggle").forEach((btn) => {
-    const targetId = btn.dataset.target;
-    const input = document.getElementById(targetId);
-    if (!input) return;
-    // ensure initial icon present
-    if (!btn.innerHTML.trim()) btn.innerHTML = eyeSvg;
-    btn.addEventListener("click", () => {
-      const isPwd = input.type === "password";
-      input.type = isPwd ? "text" : "password";
-      btn.innerHTML = isPwd ? eyeOffSvg : eyeSvg;
-      btn.setAttribute(
-        "aria-label",
-        isPwd ? "Masquer le mot de passe" : "Afficher le mot de passe"
-      );
-    });
-  });
-})();
-
-chargerAgendas();
+// initialisation
+setTimeout(() => {
+  // si tu n'as pas de select/inputs remplace par tes propres éléments HTML
+  chargerAgendas();
+  // init UI handlers
+  initUIHandlers();
+}, 50);
