@@ -84,21 +84,23 @@ function afficherSemaine() {
 /* === Affiche les rendez-vous === */
 function afficherRdvs(weekDates) {
   if (!agendaDefaut) return;
-  // calculer borne de la semaine affichée (inclusif)
+
+  // borne de la semaine affichée (inclusif)
   const weekStart = new Date(weekDates[0]);
   weekStart.setHours(0, 0, 0, 0);
   const weekEnd = new Date(weekDates[6]);
   weekEnd.setHours(23, 59, 59, 999);
 
-  // parcourir les rdvs et n'afficher que ceux dont la date est dans la semaine
   agendaDefaut.rdvs.forEach((rdv) => {
-    const date = new Date(rdv.date);
+    const start = new Date(rdv.startTime);
+    const end = new Date(rdv.endTime);
 
-    // ignorer les rdvs hors de la semaine affichée
-    if (date < weekStart || date > weekEnd) return;
+    // ignorer les RDVs hors de la semaine affichée
+    if (start < weekStart || start > weekEnd) return;
 
-    const col = (date.getDay() + 6) % 7; // lundi=0
-    const row = date.getHours() - 8;
+    // calcul de la colonne (jour) et ligne (heure de début)
+    const col = (start.getDay() + 6) % 7; // lundi = 0
+    const row = start.getHours() - 8;
     if (row < 0 || row >= 10 || col < 0 || col >= 7) return;
 
     const grid = document.querySelectorAll(".week-grid")[row + 1];
@@ -106,17 +108,23 @@ function afficherRdvs(weekDates) {
     const cell = grid.children[col + 1];
     if (!cell) return;
 
+    // créer le bloc RDV
     const div = document.createElement("div");
     div.className = "rdv";
     div.textContent = rdv.titre;
     div.title = rdv.description || "";
 
-    // clic gauche → modifier (stopPropagation pour éviter que la cellule parent n'ouvre un nouveau RDV)
+    // calculer la hauteur proportionnelle à la durée
+    const durationMin = (end - start) / (1000 * 60); // durée en minutes
+    const cellHeight = cell.offsetHeight; // hauteur d'une ligne
+    div.style.height = `${(durationMin / 60) * cellHeight}px`;
+
+    // clic gauche → modifier
     div.onclick = (e) => {
       e.stopPropagation();
       modifierRdv(rdv);
     };
-    // clic droit → supprimer (stopPropagation pour éviter déclenchements parents)
+    // clic droit → supprimer
     div.oncontextmenu = (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -127,13 +135,22 @@ function afficherRdvs(weekDates) {
   });
 }
 
-/* === Ouvre la fenêtre d'ajout/modif === */
+
 function ouvrirModal(date) {
   rdvEnEdition = null;
   selectedDate = date;
+
   document.getElementById("modalTitle").textContent = "Nouveau RDV";
   document.getElementById("titre").value = "";
   document.getElementById("desc").value = "";
+
+  // heure par défaut = heure cliquée
+  const hour = date.getHours().toString().padStart(2, "0") + ":00";
+  document.getElementById("startTime").value = hour;
+  document.getElementById("endTime").value = (date.getHours() + 1)
+    .toString()
+    .padStart(2, "0") + ":00";
+
   document.getElementById("modal").classList.remove("hidden");
 }
 
@@ -145,14 +162,39 @@ document.getElementById("closeModal").onclick = () =>
 document.getElementById("saveRdv").onclick = async () => {
   const titre = document.getElementById("titre").value.trim();
   const description = document.getElementById("desc").value.trim();
+  const start = document.getElementById("startTime").value;
+  const end = document.getElementById("endTime").value;
+
   if (!titre) return showNotif("Titre requis", "error");
   if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
+
+  if (!start || !end) return showNotif("Heure début/fin requise", "error");
+  if (end <= start)
+    return showNotif("L'heure de fin doit être après l'heure de début", "error");
+
+  // Construire vraies dates complètes
+  const startTime = new Date(selectedDate);
+  const [sh, sm] = start.split(":").map(Number);
+  startTime.setHours(sh, sm, 0, 0);
+
+  const endTime = new Date(selectedDate);
+  const [eh, em] = end.split(":").map(Number);
+  endTime.setHours(eh, em, 0, 0);
+
+  console.log("selectedDate:", selectedDate);
+  console.log("dateDebut:", startTime);
+  console.log("dateFin:", endTime);
+  const body = JSON.stringify({
+    titre,
+    description,
+    startTime,
+    endTime
+  });
 
   const url = rdvEnEdition
     ? `/api/agenda/${agendaDefaut._id}/rdv/${rdvEnEdition._id}`
     : `/api/agenda/${agendaDefaut._id}/rdv`;
   const method = rdvEnEdition ? "PUT" : "POST";
-  const body = JSON.stringify({ titre, description, date: selectedDate });
 
   try {
     const res = await fetch(url, {
@@ -178,6 +220,7 @@ document.getElementById("saveRdv").onclick = async () => {
   }
 };
 
+
 /* === Suppression d'un RDV === */
 async function supprimerRdv(rdvId) {
   if (!agendaDefaut) return showNotif("Aucun agenda trouvé", "error");
@@ -201,10 +244,21 @@ async function supprimerRdv(rdvId) {
 /* === Modification d'un RDV === */
 function modifierRdv(rdv) {
   rdvEnEdition = rdv;
-  selectedDate = new Date(rdv.date);
+
+  const debut = new Date(rdv.startTime);
+  const fin = new Date(rdv.endTime);
+
+  selectedDate = debut; // date de référence du jour
+
   document.getElementById("modalTitle").textContent = "Modifier RDV";
   document.getElementById("titre").value = rdv.titre;
   document.getElementById("desc").value = rdv.description || "";
+
+  document.getElementById("startTime").value =
+    debut.toTimeString().slice(0, 5);
+  document.getElementById("endTime").value =
+    fin.toTimeString().slice(0, 5);
+
   document.getElementById("modal").classList.remove("hidden");
 }
 

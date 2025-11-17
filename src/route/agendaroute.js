@@ -18,7 +18,12 @@ router.post("/", isAuthenticated, async (req, res) => {
 });
 
 router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
-  const { titre, date, description } = req.body;
+  const { titre, description, startTime, endTime } = req.body;
+
+  if (!titre || !startTime || !endTime) {
+    return res.status(400).json({ message: "Champs manquants" });
+  }
+
   const agenda = await Agenda.findOne({
     _id: req.params.agendaId,
     userId: req.session.userId,
@@ -26,8 +31,9 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
 
   if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
 
-  agenda.rdvs.push({ titre, date, description });
+  agenda.rdvs.push({ titre, startTime, endTime, description });
   await agenda.save();
+
   res.status(201).json(agenda);
 });
 
@@ -49,7 +55,7 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 // --- MODIFICATION D'UN RDV ---
 router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   const { agendaId, rdvId } = req.params;
-  const { titre, description, date } = req.body;
+  const { titre, description, startTime, endTime } = req.body;
 
   const agenda = await Agenda.findOne({
     _id: agendaId,
@@ -62,7 +68,8 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
   if (titre) rdv.titre = titre;
   if (description) rdv.description = description;
-  if (date) rdv.date = date;
+  if (startTime) rdv.startTime = startTime;
+  if (endTime) rdv.endTime = endTime;
 
   await agenda.save();
   res.json({ message: "Rendez-vous modifié" });
