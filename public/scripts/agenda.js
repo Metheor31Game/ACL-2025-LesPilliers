@@ -259,11 +259,10 @@ function renderAgendaSemaine() {
             : new Date(start.getTime() + 60 * 60 * 1000);
           const durationMin = Math.max(15, (end - start) / (1000 * 60)); // at least 15 minutes
 
-          el.innerHTML = `<strong>${
-            rdv.titre
-          }${recurringLabel}</strong><div class=\"text-xs\">${timeStr(
-            rdv.date || rdv.startTime
-          )}</div>`;
+          // show title and full time range (start - end)
+          el.innerHTML =
+            `<strong>${rdv.titre}${recurringLabel}</strong>` +
+            `<div class="text-xs">${timeStr(start)} - ${timeStr(end)}</div>`;
 
           // position and size the element within the hour cell according to minutes/duration
           const cellHeight = dayCell.offsetHeight || 60;
@@ -427,6 +426,27 @@ function ouvrirEditionRdv(agenda, rdv) {
   const recur = document.getElementById("recurrence");
   if (recur) recur.value = rdv.recurrence || "none";
 
+  // populate start/end inputs for editing (support startTime/endTime or date)
+  try {
+    const startEl = document.getElementById("startTime");
+    const endEl = document.getElementById("endTime");
+    const debut = rdv.startTime
+      ? new Date(rdv.startTime)
+      : rdv.date
+      ? new Date(rdv.date)
+      : null;
+    const fin = rdv.endTime
+      ? new Date(rdv.endTime)
+      : debut
+      ? new Date(debut.getTime() + 60 * 60 * 1000)
+      : null;
+    if (debut && startEl) startEl.value = debut.toTimeString().slice(0, 5);
+    if (fin && endEl) endEl.value = fin.toTimeString().slice(0, 5);
+    if (debut) selectedDateForModal = new Date(debut);
+  } catch (e) {
+    console.warn("[agenda] could not populate edit times", e);
+  }
+
   // override save button for patch
   const saveBtn = document.getElementById("saveRdv");
   saveBtn.onclick = async () => {
@@ -447,16 +467,36 @@ function ouvrirEditionRdv(agenda, rdv) {
           .map((c) => c.value);
       }
 
+      // include updated times when editing
+      const startInput = document.getElementById("startTime")?.value;
+      const endInput = document.getElementById("endTime")?.value;
+      let payload = {
+        titre: newTitre,
+        description: newDesc,
+        recurrence,
+        agendaIds,
+      };
+      if (startInput && endInput) {
+        const base = rdv.startTime
+          ? new Date(rdv.startTime)
+          : rdv.date
+          ? new Date(rdv.date)
+          : new Date();
+        const [sh, sm] = startInput.split(":").map(Number);
+        const [eh, em] = endInput.split(":").map(Number);
+        const s = new Date(base);
+        s.setHours(sh, sm, 0, 0);
+        const e = new Date(base);
+        e.setHours(eh, em, 0, 0);
+        payload.startTime = s;
+        payload.endTime = e;
+      }
+
       const res = await fetch(`/api/agenda/${agenda._id}/rdv/${rdv._id}`, {
-        method: "PATCH",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          titre: newTitre,
-          description: newDesc,
-          recurrence,
-          agendaIds,
-        }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const err = await res.text();
