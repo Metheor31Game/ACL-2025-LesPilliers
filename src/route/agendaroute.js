@@ -187,23 +187,49 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
   if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
 
-  const rdv = agenda.rdvs.id(req.params.rdvId);
+  const rdv = agenda.rdvs.id(rdvId);
   if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
 
-  if (titre !== undefined) rdv.titre = titre;
-  if (date !== undefined) rdv.date = date;
-  if (description !== undefined) rdv.description = description;
-
-  // ensure sharedId exists for synchronization
-  let sharedId = rdv.sharedId;
-  if (!sharedId) {
-    sharedId = new mongoose.Types.ObjectId();
-    rdv.sharedId = sharedId;
-  }
-
+  // remove the rdv from this agenda
+  rdv.remove();
   await agenda.save();
 
   res.json({ message: "Rendez-vous supprimé" });
+});
+
+// delete RDV copies across multiple agendas (by sharedId or rdvId)
+router.post("/rdv/delete", isAuthenticated, async (req, res) => {
+  try {
+    const { agendaIds, sharedId, rdvId } = req.body;
+    if (!Array.isArray(agendaIds) || agendaIds.length === 0)
+      return res.status(400).json({ message: "agendaIds requis" });
+
+    for (const aid of agendaIds) {
+      const agenda = await Agenda.findOne({
+        _id: aid,
+        userId: req.session.userId,
+      });
+      if (!agenda) continue;
+
+      if (sharedId) {
+        agenda.rdvs = agenda.rdvs.filter((r) => {
+          if (!r.sharedId) return true;
+          return r.sharedId.toString() !== String(sharedId);
+        });
+      } else if (rdvId) {
+        agenda.rdvs = agenda.rdvs.filter(
+          (r) => String(r._id) !== String(rdvId)
+        );
+      }
+
+      await agenda.save();
+    }
+
+    res.json({ message: "RDV(s) supprimé(s)" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // --- MODIFICATION D'UN RDV ---
