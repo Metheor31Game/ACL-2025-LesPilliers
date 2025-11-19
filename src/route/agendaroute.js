@@ -57,8 +57,7 @@ router.get("/", isAuthenticated, async (req, res) => {
           });
         }
       } else if (rdv.recurrence === "monthly") {
-
-      /* === RDV MENSUEL === */
+        /* === RDV MENSUEL === */
         // On génère le RDV si le jour du mois correspond
         const clone = new Date(monday);
         clone.setDate(original.getDate());
@@ -76,8 +75,7 @@ router.get("/", isAuthenticated, async (req, res) => {
           });
         }
       } else if (rdv.recurrence === "yearly") {
-
-      /* === RDV ANNUEL === */
+        /* === RDV ANNUEL === */
         const clone = new Date(
           monday.getFullYear(),
           original.getMonth(),
@@ -154,7 +152,11 @@ router.delete("/:agendaId", isAuthenticated, async (req, res) => {
 // --- AJOUT D'UN RDV perm ---
 router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
   // modification pour RDV perm
-  const { titre, date, description, recurrence } = req.body;
+  const { titre, date, description, startTime, endTime, recurrence } = req.body;
+  if (!titre || !startTime || !endTime) {
+    return res.status(400).json({ message: "Champs manquants" });
+  }
+
   const agenda = await Agenda.findOne({
     _id: req.params.agendaId,
     userId: req.session.userId,
@@ -167,10 +169,12 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
     titre,
     date,
     description,
+    startTime,
+    endTime,
     recurrence: recurrence || "none",
   });
-
   await agenda.save();
+
   res.status(201).json(agenda);
 });
 
@@ -205,7 +209,7 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 // --- MODIFICATION D'UN RDV ---
 router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   const { agendaId, rdvId } = req.params;
-  const { titre, description, date, recurrence } = req.body;
+  const { titre, description, date, startTime, endTime, recurrence } = req.body;
 
   const agenda = await Agenda.findOne({
     _id: agendaId,
@@ -219,6 +223,8 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   if (titre) rdv.titre = titre;
   if (description) rdv.description = description;
   if (date) rdv.date = date;
+  if (startTime) rdv.startTime = startTime;
+  if (endTime) rdv.endTime = endTime;
   if (recurrence) rdv.recurrence = recurrence;
 
   await agenda.save();

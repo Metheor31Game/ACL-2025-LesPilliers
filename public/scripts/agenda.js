@@ -67,6 +67,7 @@ function timeStr(d) {
 
 // ---- chargement / affichage ----
 async function chargerAgendas() {
+  console.log("[agenda] chargerAgendas() start");
   try {
     const res = await fetch("/api/agenda", { credentials: "include" });
     if (res.status === 401) return (window.location.href = "connexion.html");
@@ -229,7 +230,8 @@ function renderAgendaSemaine() {
         if (!visibleAgendas[agenda._id]) return;
         const color = colors[idx % colors.length];
         const rdvs = (agenda.rdvs || []).filter((r) => {
-          const rdvDate = new Date(r.date);
+          // support rdvs stored with `date` or with `startTime`
+          const rdvDate = new Date(r.date || r.startTime);
           // exact match
           const exact =
             rdvDate.getFullYear() === dt.getFullYear() &&
@@ -249,11 +251,31 @@ function renderAgendaSemaine() {
           el.style.background = color;
           el.title = `${agenda.nom} — ${rdv.titre}\n${rdv.description || ""}`;
           const recurringLabel = rdv.recurrence === "weekly" ? " (perm.)" : "";
+
+          // compute start and end times (support `date` or `startTime`)
+          const start = new Date(rdv.startTime || rdv.date);
+          const end = rdv.endTime
+            ? new Date(rdv.endTime)
+            : new Date(start.getTime() + 60 * 60 * 1000);
+          const durationMin = Math.max(15, (end - start) / (1000 * 60)); // at least 15 minutes
+
           el.innerHTML = `<strong>${
             rdv.titre
           }${recurringLabel}</strong><div class=\"text-xs\">${timeStr(
-            rdv.date
+            rdv.date || rdv.startTime
           )}</div>`;
+
+          // position and size the element within the hour cell according to minutes/duration
+          const cellHeight = dayCell.offsetHeight || 60;
+          const minuteOffset = start.getMinutes() || 0;
+          const topPx = Math.round((minuteOffset / 60) * cellHeight) + 4; // small padding
+          const heightPx = Math.round((durationMin / 60) * cellHeight) - 8; // account for padding
+
+          el.style.top = `${topPx}px`;
+          el.style.height = `${Math.max(18, heightPx)}px`;
+          el.style.bottom = "auto";
+          el.style.zIndex = 5;
+
           el.onclick = (ev) => {
             ev.stopPropagation();
             ouvrirEditionRdv(agenda, rdv);
@@ -290,6 +312,11 @@ function renderAgendaSemaine() {
 
 // ---- actions agenda ----
 async function creerAgenda(nom) {
+  if (creerAgenda._inFlight) return;
+  creerAgenda._inFlight = true;
+  // disable sidebar add button to avoid double submissions
+  const sidebarBtn = document.getElementById("sidebarBtnAddAgenda");
+  if (sidebarBtn) sidebarBtn.disabled = true;
   try {
     const res = await fetch("/api/agenda", {
       method: "POST",
@@ -307,6 +334,9 @@ async function creerAgenda(nom) {
   } catch (err) {
     console.error(err);
     showNotif("Erreur création agenda", "err");
+  } finally {
+    creerAgenda._inFlight = false;
+    if (sidebarBtn) sidebarBtn.disabled = false;
   }
 }
 
@@ -528,9 +558,39 @@ function setDefaultSaveAction() {
 
     const titre = document.getElementById("titre").value.trim();
     const description = document.getElementById("desc").value.trim();
-    const date = selectedDateForModal;
     const recurrence = document.getElementById("recurrence")?.value || "none";
-    if (!titre || !date) return showNotif("Titre et heure requis", "err");
+    const startInput = document.getElementById("startTime")?.value;
+    const endInput = document.getElementById("endTime")?.value;
+    // selectedDateForModal should be a Date or parsable string
+    let baseDate = selectedDateForModal
+      ? typeof selectedDateForModal === "string"
+        ? new Date(selectedDateForModal)
+        : new Date(selectedDateForModal)
+      : null;
+    // fallback to today if no base date (allow user to create by typing times)
+    if (!baseDate) {
+      console.warn("[agenda] no selectedDateForModal, falling back to now");
+      baseDate = new Date();
+    }
+
+    // debug: log values to help identify why validation fails
+    console.log("[agenda] creating RDV payload values", {
+      titre,
+      baseDate,
+      startInput,
+      endInput,
+      agendaIds,
+    });
+    if (!titre || !startInput || !endInput)
+      return showNotif("Titre et heure requis", "err");
+
+    // build full Date objects for startTime and endTime
+    const [sh, sm] = startInput.split(":").map(Number);
+    const [eh, em] = endInput.split(":").map(Number);
+    const startTime = new Date(baseDate);
+    startTime.setHours(sh, sm, 0, 0);
+    const endTime = new Date(baseDate);
+    endTime.setHours(eh, em, 0, 0);
 
     try {
       const res = await fetch(`/api/agenda/${agendaIds[0]}/rdv`, {
@@ -540,7 +600,8 @@ function setDefaultSaveAction() {
         body: JSON.stringify({
           titre,
           description,
-          date,
+          startTime,
+          endTime,
           agendaIds,
           recurrence,
         }),
@@ -588,12 +649,30 @@ function populateAgendaPicker(initialCheckedIds = []) {
 }
 
 function openModalForDate(date) {
-  selectedDateForModal = date;
+  // accept ISO string or Date
+  if (typeof date === "string") selectedDateForModal = new Date(date);
+  else selectedDateForModal = date;
   const modal = document.getElementById("modal");
   if (modal) modal.classList.remove("hidden");
   populateAgendaPicker();
   const recur = document.getElementById("recurrence");
   if (recur) recur.value = "none";
+  // set sensible default start/end times based on clicked date
+  try {
+    const startEl = document.getElementById("startTime");
+    const endEl = document.getElementById("endTime");
+    if (selectedDateForModal && startEl && endEl) {
+      const d =
+        typeof selectedDateForModal === "string"
+          ? new Date(selectedDateForModal)
+          : new Date(selectedDateForModal);
+      const h = d.getHours();
+      startEl.value = String(h).padStart(2, "0") + ":00";
+      endEl.value = String((h + 1) % 24).padStart(2, "0") + ":00";
+    }
+  } catch (e) {
+    console.warn("[agenda] could not set default times", e);
+  }
   setDefaultSaveAction();
 }
 
@@ -632,6 +711,7 @@ function attachGridSlotHandlers() {
 
 /* Init UI: handlers for account modal and modal close/save defaults */
 function initUIHandlers() {
+  console.log("[agenda] initUIHandlers() start");
   const accountBtn = document.getElementById("accountBtn");
   const accountModal = document.getElementById("accountModal");
   const accountNameEl = document.getElementById("accountName");
@@ -704,6 +784,11 @@ function initUIHandlers() {
     pickerToggle.addEventListener("click", () =>
       picker.classList.toggle("hidden")
     );
+  } else {
+    console.warn("[agenda] agendaPickerToggle or agendaPicker not found", {
+      pickerToggle: !!pickerToggle,
+      picker: !!picker,
+    });
   }
 
   const sidebar = document.getElementById("agendaSidebar");
@@ -722,6 +807,11 @@ function initUIHandlers() {
         sidebarToggle.setAttribute("aria-expanded", "false");
         sidebarToggle.classList.remove("open");
       }
+    });
+  } else {
+    console.warn("[agenda] sidebarToggle or agendaSidebar not found", {
+      sidebar: !!sidebar,
+      sidebarToggle: !!sidebarToggle,
     });
   }
 
@@ -759,6 +849,12 @@ function initUIHandlers() {
     });
   });
 })();
+
+// expose functions for the initializer (agenda.main.js) to call
+if (typeof initUIHandlers === "function")
+  window.initUIHandlers = initUIHandlers;
+if (typeof chargerAgendas === "function")
+  window.chargerAgendas = chargerAgendas;
 
 // --- EXPORT / IMPORT ---
 document.getElementById("exportAgenda")?.addEventListener("click", async () => {
@@ -809,3 +905,14 @@ setTimeout(() => {
   chargerAgendas();
   initUIHandlers();
 }, 50);
+
+// global error catcher to help debugging in-browser
+window.addEventListener("error", (e) => {
+  console.error("[agenda] uncaught error", e.error || e.message, e);
+  try {
+    showNotif(
+      "Erreur JS: " + (e.error?.message || e.message || "inconnu"),
+      "err"
+    );
+  } catch (_) {}
+});

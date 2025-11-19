@@ -2,7 +2,6 @@ const mongoose = require("mongoose");
 
 const rdvSchema = new mongoose.Schema({
   titre: { type: String, required: true },
-  date: { type: Date, required: true },
   description: { type: String },
 
   // Ajout pour RDV permanents
@@ -11,6 +10,8 @@ const rdvSchema = new mongoose.Schema({
     enum: ["none", "weekly", "monthly", "yearly"],
     default: "none",
   },
+  startTime: { type: Date, required: true },
+  endTime: { type: Date, required: true },
 });
 
 module.exports = rdvSchema;
