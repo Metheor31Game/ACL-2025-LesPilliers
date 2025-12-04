@@ -16,16 +16,16 @@ const router = express.Router();
 const Agenda = require("../model/Agenda");
 const isAuthenticated = require("../middleware/auth");
 
-// list agendas for current user
+// rdv recurrence types: none, weekly, monthly, yearly
 router.get("/", isAuthenticated, async (req, res) => {
   const agendas = await Agenda.find({ userId: req.session.userId });
 
-  // Récupération de la semaine envoyée par le frontend
+  // Semaine demandée par le front (param ?week=YYYY-MM-DD)
   const weekParam = req.query.week;
   const startOfWeek = weekParam ? new Date(weekParam) : new Date();
 
   // Forcer lundi 00:00
-  const day = startOfWeek.getDay();
+  const day = startOfWeek.getDay(); // 0 = dimanche, 1 = lundi, ...
   const monday = new Date(startOfWeek);
   monday.setDate(startOfWeek.getDate() - (day === 0 ? 6 : day - 1));
   monday.setHours(0, 0, 0, 0);
@@ -34,48 +34,77 @@ router.get("/", isAuthenticated, async (req, res) => {
   sunday.setDate(monday.getDate() + 6);
   sunday.setHours(23, 59, 59, 999);
 
-  const result = agendas.map((agenda) => {
+    const result = agendas.map((agenda) => {
     const a = agenda.toObject();
     const generated = [];
 
     for (const rdv of agenda.rdvs) {
-      const original = new Date(rdv.date);
+      // On récupère la vraie date de départ du RDV
+      const original =
+        rdv.startTime
+          ? new Date(rdv.startTime)
+          : rdv.date
+          ? new Date(rdv.date)
+          : null;
+
+      if (!original || isNaN(original.getTime())) continue;
+
+      // Si toute la semaine affichée est avant la création du RDV, on ne génère rien
+      if (sunday < original) continue;
+
+      /* === RDV QUOTIDIEN === */
+      if (rdv.recurrence === "daily") {
+        for (let i = 0; i < 7; i++) {
+          const clone = new Date(monday);
+          clone.setDate(monday.getDate() + i);
+          clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
+
+          if (clone >= monday && clone <= sunday && clone >= original) {
+            generated.push({
+              ...rdv.toObject(),
+              date: clone,
+              startTime: clone,
+              _id: rdv._id,
+            });
+          }
+        }
 
       /* === RDV HEBDOMADAIRE === */
-      if (rdv.recurrence === "weekly") {
-        const originalDow = (original.getDay() + 6) % 7;
+      } else if (rdv.recurrence === "weekly") {
+        const originalDow = (original.getDay() + 6) % 7; // 0 = lundi
 
         const clone = new Date(monday);
         clone.setDate(monday.getDate() + originalDow);
         clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
 
-        if (clone >= monday && clone <= sunday) {
+        if (clone >= monday && clone <= sunday && clone >= original) {
           generated.push({
             ...rdv.toObject(),
             date: clone,
+            startTime: clone,
             _id: rdv._id,
           });
         }
+
+      /* === RDV MENSUEL === */
       } else if (rdv.recurrence === "monthly") {
-        /* === RDV MENSUEL === */
-        // On génère le RDV si le jour du mois correspond
         const clone = new Date(monday);
+        clone.setMonth(monday.getMonth());
+        clone.setFullYear(monday.getFullYear());
         clone.setDate(original.getDate());
         clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
 
-        // Et on remet le bon mois/année de la semaine affichée
-        clone.setMonth(monday.getMonth());
-        clone.setFullYear(monday.getFullYear());
-
-        if (clone >= monday && clone <= sunday) {
+        if (clone >= monday && clone <= sunday && clone >= original) {
           generated.push({
             ...rdv.toObject(),
             date: clone,
+            startTime: clone,
             _id: rdv._id,
           });
         }
+
+      /* === RDV ANNUEL === */
       } else if (rdv.recurrence === "yearly") {
-        /* === RDV ANNUEL === */
         const clone = new Date(
           monday.getFullYear(),
           original.getMonth(),
@@ -86,10 +115,11 @@ router.get("/", isAuthenticated, async (req, res) => {
           0
         );
 
-        if (clone >= monday && clone <= sunday) {
+        if (clone >= monday && clone <= sunday && clone >= original) {
           generated.push({
             ...rdv.toObject(),
             date: clone,
+            startTime: clone,
             _id: rdv._id,
           });
         }
@@ -102,6 +132,7 @@ router.get("/", isAuthenticated, async (req, res) => {
 
   res.json(result);
 });
+
 
 // create a new agenda
 router.post("/", isAuthenticated, async (req, res) => {

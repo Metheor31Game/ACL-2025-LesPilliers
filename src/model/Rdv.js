@@ -7,7 +7,7 @@ const rdvSchema = new mongoose.Schema({
   // Ajout pour RDV permanents
   recurrence: {
     type: String,
-    enum: ["none", "weekly", "monthly", "yearly"],
+    enum: ["none", "daily","weekly", "monthly", "yearly"],
     default: "none",
   },
   startTime: { type: Date, required: true },
