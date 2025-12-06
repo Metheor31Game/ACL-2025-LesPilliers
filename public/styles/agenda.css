@@ -57,6 +57,9 @@ body {
   position: relative;
   cursor: pointer;
 }
+.day-cell.today-day {
+  background: #e7eaef;
+}
 
 .rdv {
   position: absolute;

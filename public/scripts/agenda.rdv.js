@@ -58,6 +58,11 @@ function renderAgendaSemaine() {
       const dt = new Date(jour);
       dt.setHours(h, 0, 0, 0);
       dayCell.setAttribute("data-datetime", dt.toISOString());
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (jour.getTime() === today.getTime()) {
+        dayCell.classList.add("today-day");
+      }
 
       // populate rdvs matching this day and hour
       agendas.forEach((agenda, idx) => {
