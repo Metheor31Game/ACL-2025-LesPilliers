@@ -339,3 +339,31 @@ body {
     top: -12px;
   }
 }
+
+/* badges colorés élégants */
+.rec-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-left: 4px;
+  color: white;
+}
+
+.rec-badge.daily {
+  background-color: #2563eb; /* bleu */
+}
+
+.rec-badge.weekly {
+  background-color: #059669; /* vert */
+}
+
+.rec-badge.monthly {
+  background-color: #d97706; /* orange */
+}
+
+.rec-badge.yearly {
+  background-color: #7c3aed; /* violet */
+}
+

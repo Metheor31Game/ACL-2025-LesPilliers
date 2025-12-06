@@ -15,6 +15,7 @@ const router = express.Router();
 
 const Agenda = require("../model/Agenda");
 const isAuthenticated = require("../middleware/auth");
+const generateRecurrences = require("../utils/generateRecurrences");
 
 // rdv recurrence types: none, weekly, monthly, yearly
 router.get("/", isAuthenticated, async (req, res) => {
@@ -36,95 +37,8 @@ router.get("/", isAuthenticated, async (req, res) => {
 
     const result = agendas.map((agenda) => {
     const a = agenda.toObject();
-    const generated = [];
 
-    for (const rdv of agenda.rdvs) {
-      // On récupère la vraie date de départ du RDV
-      const original =
-        rdv.startTime
-          ? new Date(rdv.startTime)
-          : rdv.date
-          ? new Date(rdv.date)
-          : null;
-
-      if (!original || isNaN(original.getTime())) continue;
-
-      // Si toute la semaine affichée est avant la création du RDV, on ne génère rien
-      if (sunday < original) continue;
-
-      /* === RDV QUOTIDIEN === */
-      if (rdv.recurrence === "daily") {
-        for (let i = 0; i < 7; i++) {
-          const clone = new Date(monday);
-          clone.setDate(monday.getDate() + i);
-          clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
-
-          if (clone >= monday && clone <= sunday && clone >= original) {
-            generated.push({
-              ...rdv.toObject(),
-              date: clone,
-              startTime: clone,
-              _id: rdv._id,
-            });
-          }
-        }
-
-      /* === RDV HEBDOMADAIRE === */
-      } else if (rdv.recurrence === "weekly") {
-        const originalDow = (original.getDay() + 6) % 7; // 0 = lundi
-
-        const clone = new Date(monday);
-        clone.setDate(monday.getDate() + originalDow);
-        clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
-
-        if (clone >= monday && clone <= sunday && clone >= original) {
-          generated.push({
-            ...rdv.toObject(),
-            date: clone,
-            startTime: clone,
-            _id: rdv._id,
-          });
-        }
-
-      /* === RDV MENSUEL === */
-      } else if (rdv.recurrence === "monthly") {
-        const clone = new Date(monday);
-        clone.setMonth(monday.getMonth());
-        clone.setFullYear(monday.getFullYear());
-        clone.setDate(original.getDate());
-        clone.setHours(original.getHours(), original.getMinutes(), 0, 0);
-
-        if (clone >= monday && clone <= sunday && clone >= original) {
-          generated.push({
-            ...rdv.toObject(),
-            date: clone,
-            startTime: clone,
-            _id: rdv._id,
-          });
-        }
-
-      /* === RDV ANNUEL === */
-      } else if (rdv.recurrence === "yearly") {
-        const clone = new Date(
-          monday.getFullYear(),
-          original.getMonth(),
-          original.getDate(),
-          original.getHours(),
-          original.getMinutes(),
-          0,
-          0
-        );
-
-        if (clone >= monday && clone <= sunday && clone >= original) {
-          generated.push({
-            ...rdv.toObject(),
-            date: clone,
-            startTime: clone,
-            _id: rdv._id,
-          });
-        }
-      }
-    }
+    const generated = generateRecurrences(agenda.rdvs, monday, sunday);
 
     a.rdvs = [...agenda.rdvs, ...generated];
     return a;
@@ -209,24 +123,54 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
   res.status(201).json(agenda);
 });
 
+// --- SUPPRESSION D'UN RDV OU D'UNE OCCURRENCE ---
 router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
-  const { agendaId, rdvId } = req.params;
-  const agenda = await Agenda.findOne({
-    _id: agendaId,
-    userId: req.session.userId,
-  });
+  try {
+    const { agendaId, rdvId } = req.params;
+    const { date } = req.query;
 
-  if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+    console.log("DELETE CALLED");
+    console.log("agendaId =", agendaId);
+    console.log("rdvId =", rdvId);
+    console.log("date =", date);
 
-  const rdv = agenda.rdvs.id(rdvId);
-  if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
+    const agenda = await Agenda.findOne({
+      _id: agendaId,
+      userId: req.session.userId,
+    });
 
-  // remove the rdv from this agenda
-  rdv.remove();
-  await agenda.save();
+    if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
 
-  res.json({ message: "Rendez-vous supprimé" });
+    const rdv = agenda.rdvs.id(rdvId);
+    if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
+
+    // CAS 1 : suppression d'une occurrence d'un RDV récurrent
+    if (rdv.recurrence !== "none" && date) {
+      const d = new Date(date);
+
+      if (!rdv.exceptions) rdv.exceptions = [];
+
+      rdv.exceptions.push(d);
+      await agenda.save();
+
+      return res.json({ message: "Occurrence supprimée" });
+    }
+
+    //  CAS 2 : suppression complète du RDV
+    await rdv.deleteOne();  
+    await agenda.save();
+
+    return res.json({ message: "RDV supprimé" });
+
+  } catch (err) {
+    console.error("DELETE RDV error:", err);
+    return res.status(500).json({ message: "Erreur interne suppression RDV" });
+  }
 });
+
+
+
+
 
 // delete RDV copies across multiple agendas (by sharedId or rdvId)
 router.post("/rdv/delete", isAuthenticated, async (req, res) => {

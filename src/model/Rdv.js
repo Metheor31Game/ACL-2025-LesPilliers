@@ -12,6 +12,13 @@ const rdvSchema = new mongoose.Schema({
   },
   startTime: { type: Date, required: true },
   endTime: { type: Date, required: true },
+
+  // NOUVEAU : permet de supprimer une SEULE occurrence d’un RDV récurrent
+  // Exemple : exceptions = ["2025-12-22T10:00:00.000Z"]
+  exceptions: {
+    type: [Date],
+    default: [],
+  }
 });
 
 module.exports = rdvSchema;

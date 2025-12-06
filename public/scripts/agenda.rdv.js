@@ -4,6 +4,23 @@
 let selectedDateForModal = null;
 let rdvEnEdition = null;
 
+// affiche le badge de récurrence dans le RDV
+function recurrenceLabel(r) {
+  switch (r.recurrence) {
+    case "daily":
+      return `<span class="rec-badge daily">quotidien</span>`;
+    case "weekly":
+      return `<span class="rec-badge weekly">hebdo</span>`;
+    case "monthly":
+      return `<span class="rec-badge monthly">mensuel</span>`;
+    case "yearly":
+      return `<span class="rec-badge yearly">annuel</span>`;
+    default:
+      return "";
+  }
+}
+
+
 function renderAgendaSemaine() {
   const container = document.getElementById("agendaContainer");
   if (!container) return;
@@ -63,26 +80,56 @@ function renderAgendaSemaine() {
       agendas.forEach((agenda, idx) => {
         if (!visibleAgendas[agenda._id]) return;
         const color = colors[idx % colors.length];
+
+        // Trouver les rdvs (y compris récurrents) Ks
         const rdvs = (agenda.rdvs || []).filter((r) => {
-          const rdvDate = new Date(r.date || r.startTime);
-          const exact =
-            rdvDate.getFullYear() === dt.getFullYear() &&
-            rdvDate.getMonth() === dt.getMonth() &&
-            rdvDate.getDate() === dt.getDate() &&
-            rdvDate.getHours() === dt.getHours();
-          const weekly =
-            r.recurrence === "weekly" &&
-            rdvDate.getDay() === dt.getDay() &&
-            rdvDate.getHours() === dt.getHours();
-          return exact || weekly;
-        });
+        const rdvDate = new Date(r.date || r.startTime);
+        const original = new Date(r.startTime || r.date);
+
+
+        // N’AFFICHE RIEN AVANT LA DATE D’ORIGINE
+        if (dt < original) return false;
+        // Occurrence exacte dans cette semaine
+
+        const exact =
+          rdvDate.getFullYear() === dt.getFullYear() &&
+          rdvDate.getMonth() === dt.getMonth() &&
+          rdvDate.getDate() === dt.getDate() &&
+          rdvDate.getHours() === dt.getHours();
+
+        // Quotidien
+        const daily =
+          r.recurrence === "daily" &&
+          rdvDate.getHours() === dt.getHours();
+
+        // Hebdomadaire
+        const weekly =
+          r.recurrence === "weekly" &&
+          rdvDate.getDay() === dt.getDay() &&
+          rdvDate.getHours() === dt.getHours();
+
+        // Mensuel
+        const monthly =
+          r.recurrence === "monthly" &&
+          rdvDate.getDate() === dt.getDate() &&
+          rdvDate.getHours() === dt.getHours();
+
+        // Annuel
+        const yearly =
+          r.recurrence === "yearly" &&
+          rdvDate.getDate() === dt.getDate() &&
+          rdvDate.getMonth() === dt.getMonth() &&
+          rdvDate.getHours() === dt.getHours();
+
+        return exact || daily || weekly || monthly || yearly;
+      });
+
         rdvs.forEach((rdv) => {
           const el = document.createElement("div");
           el.className = "rdv";
           el.style.background = color;
           el.title = `${agenda.nom} — ${rdv.titre}\n${rdv.description || ""}`;
-          const recurringLabel = rdv.recurrence === "weekly" ? " (perm.)" : "";
-
+          const recurringLabel = recurrenceLabel(rdv);
           const start = new Date(rdv.startTime || rdv.date);
           const end = rdv.endTime
             ? new Date(rdv.endTime)
@@ -275,35 +322,22 @@ function ouvrirEditionRdv(agenda, rdv) {
   if (delBtn) {
     delBtn.classList.remove("hidden");
     delBtn.onclick = async () => {
-      if (!confirm("Supprimer ce RDV ?")) return;
+      if (
+        !confirm(
+          `Confirmer la suppression du RDV "${rdv.titre}" dans l'agenda "${agenda.nom}" ?`
+        )
+      )
+        return;
       try {
-        const picker = document.querySelectorAll(
-          "#agendaPickerList input[type=checkbox]"
-        );
-        let agendaIds = [];
-        if (picker && picker.length) {
-          agendaIds = Array.from(picker)
-            .filter((c) => c.checked)
-            .map((c) => c.value);
-        }
-        if (!agendaIds || agendaIds.length === 0) agendaIds = [agenda._id];
-
-        const payload = { agendaIds };
-        if (rdv.sharedId) payload.sharedId = rdv.sharedId.toString();
-        else payload.rdvId = rdv._id;
-
-        const res = await fetch(`/api/agenda/rdv/delete`, {
-          method: "POST",
+        const res = await fetch(`/api/agenda/${agenda._id}/rdv/${rdv._id}`, {
+          method: "DELETE",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const err = await res.text();
           showNotif("Erreur suppression RDV: " + err, "err");
           return;
         }
-        const modal = document.getElementById("modal");
         if (modal) modal.classList.add("hidden");
         if (titre) titre.value = "";
         if (desc) desc.value = "";
@@ -314,7 +348,8 @@ function ouvrirEditionRdv(agenda, rdv) {
         console.error(err);
         showNotif("Erreur suppression RDV", "err");
       }
-    };
+    };  
+
   }
 }
 
