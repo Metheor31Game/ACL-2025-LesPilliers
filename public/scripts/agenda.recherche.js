@@ -221,6 +221,12 @@
       "input",
       debounce(() => performSearch(), 180)
     );
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        performSearch();
+      }
+    });
 
     // hide results when clicking elsewhere
     document.addEventListener("click", (e) => {
