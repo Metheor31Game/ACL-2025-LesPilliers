@@ -431,50 +431,6 @@ if (typeof initUIHandlers === "function")
 if (typeof chargerAgendas === "function")
   window.chargerAgendas = chargerAgendas;
 
-// --- EXPORT / IMPORT ---
-document.getElementById("exportAgenda")?.addEventListener("click", async () => {
-  const agendaId = window.currentAgendaId;
-  if (!agendaId) return alert("Aucun agenda sélectionné");
-  const response = await fetch(`/api/agenda/${agendaId}/export`);
-  if (!response.ok) return alert("Erreur export");
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "agenda_export.json";
-  a.click();
-  window.URL.revokeObjectURL(url);
-});
-
-document
-  .getElementById("importAgenda")
-  ?.addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const text = await file.text();
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      alert("Fichier JSON invalide");
-      return;
-    }
-    const agendaId = window.currentAgendaId;
-    if (!agendaId) return alert("Aucun agenda sélectionné");
-    const res = await fetch(`/api/agenda/${agendaId}/import`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-      credentials: "include",
-    });
-    if (res.ok) {
-      alert("Agenda importé !");
-      chargerAgendas();
-    } else {
-      alert("Erreur lors de l'import");
-    }
-  });
-
 // initialisation
 setTimeout(() => {
   chargerAgendas();

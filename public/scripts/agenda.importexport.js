@@ -1,10 +1,17 @@
 // Export / Import handlers (moved from agenda.js)
 (function attachImportExport() {
   const exportBtn = document.getElementById("exportAgenda");
+  const notify = (msg, type = "info") => {
+    if (typeof showNotif === "function") {
+      showNotif(msg, type === "error" ? "err" : type === "ok" ? "ok" : "info");
+    } else {
+      alert(msg);
+    }
+  };
   if (exportBtn) {
     exportBtn.addEventListener("click", async () => {
       const agendaId = window.currentAgendaId;
-      if (!agendaId) return alert("Aucun agenda sélectionné");
+      if (!agendaId) return notify("Aucun agenda sélectionné", "error");
       try {
         const blob = await window.agendaApi.exportAgenda(agendaId);
         const url = window.URL.createObjectURL(blob);
@@ -13,9 +20,10 @@
         a.download = "agenda_export.json";
         a.click();
         window.URL.revokeObjectURL(url);
+        notify("Agenda exporté", "ok");
       } catch (err) {
         console.error(err);
-        alert("Erreur export");
+        notify("Erreur export", "error");
       }
     });
   }
@@ -30,17 +38,20 @@
       try {
         data = JSON.parse(text);
       } catch (err) {
-        alert("Fichier JSON invalide");
+        notify("Fichier JSON invalide", "error");
         return;
       }
       const agendaId = window.currentAgendaId;
-      if (!agendaId) return alert("Aucun agenda sélectionné");
+      if (!agendaId) return notify("Aucun agenda sélectionné", "error");
       try {
         await window.agendaApi.importAgenda(agendaId, data);
-        alert("Agenda importé !");
+        if (typeof window.chargerAgendas === "function") {
+          await window.chargerAgendas();
+        }
+        notify("Agenda importé !", "ok");
       } catch (err) {
         console.error(err);
-        alert("Erreur lors de l'import");
+        notify("Erreur lors de l'import", "error");
       }
     });
   }
