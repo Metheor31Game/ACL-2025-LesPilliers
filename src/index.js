@@ -9,8 +9,8 @@ const path = require("path"); // Pour gérer les chemins de fichiers
 const authRoutes = require("./route/authroute");
 const testRoutes = require("./route/testroute");
 const agendaRoutes = require("./route/agendaroute");
-const agendaExportRoutes = require("./src/route/agenda.export");
-const agendaImportRoutes = require("./src/route/agenda.import");
+const agendaExportRoutes = require("./route/agenda.export");
+const agendaImportRoutes = require("./route/agenda.import");
 
 const app = express();
 const PORT = 3000;
