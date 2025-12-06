@@ -205,64 +205,71 @@ function ouvrirEditionRdv(agenda, rdv) {
   const recur = document.getElementById("recurrence");
   if (recur) recur.value = rdv.recurrence || "none";
 
-  try {
-    const startEl = document.getElementById("startTime");
-    const endEl = document.getElementById("endTime");
-    const debut = rdv.startTime
-      ? new Date(rdv.startTime)
-      : rdv.date
-      ? new Date(rdv.date)
-      : null;
-    const fin = rdv.endTime
-      ? new Date(rdv.endTime)
-      : debut
-      ? new Date(debut.getTime() + 60 * 60 * 1000)
-      : null;
-    if (debut && startEl) startEl.value = debut.toTimeString().slice(0, 5);
-    if (fin && endEl) endEl.value = fin.toTimeString().slice(0, 5);
-    if (debut) selectedDateForModal = new Date(debut);
-  } catch (e) {
-    console.warn("[agenda] could not populate edit times", e);
+  const startEl = document.getElementById("startTime");
+  const endEl = document.getElementById("endTime");
+  const formatTime = (value) => {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    const h = String(d.getHours()).padStart(2, "0");
+    const m = String(d.getMinutes()).padStart(2, "0");
+    return `${h}:${m}`;
+  };
+  const initialStart = rdv.startTime || rdv.date;
+  const fallbackEnd = () => {
+    if (!initialStart) return null;
+    const clone = new Date(initialStart);
+    clone.setHours(clone.getHours() + 1);
+    clone.setMinutes(clone.getMinutes(), 0, 0);
+    return clone;
+  };
+  const initialEnd = rdv.endTime || fallbackEnd();
+  if (startEl && initialStart) {
+    const startValue = formatTime(initialStart);
+    if (startValue) startEl.value = startValue;
+  }
+  if (endEl && initialEnd) {
+    const endValue = formatTime(initialEnd);
+    if (endValue) endEl.value = endValue;
   }
 
   const saveBtn = document.getElementById("saveRdv");
   if (saveBtn)
     saveBtn.onclick = async () => {
+      const targetAgendaId = getSelectedAgendaId() || getDefaultAgendaId();
+      if (!targetAgendaId) return showNotif("Sélectionnez un agenda", "err");
+
+      const newTitre = titre?.value?.trim() || "";
+      const newDesc = desc?.value?.trim() || "";
+      const recurrence = recur?.value || "none";
+      if (!newTitre) return showNotif("Titre requis", "err");
+
+      const startInput = document.getElementById("startTime")?.value;
+      const endInput = document.getElementById("endTime")?.value;
+      if (!validateTimeRange(startInput, endInput)) return;
+
+      let payload = {
+        titre: newTitre,
+        description: newDesc,
+        recurrence,
+        agendaId: targetAgendaId,
+      };
+      if (startInput && endInput) {
+        const base = rdv.startTime
+          ? new Date(rdv.startTime)
+          : rdv.date
+          ? new Date(rdv.date)
+          : new Date();
+        const [sh, sm] = startInput.split(":").map(Number);
+        const [eh, em] = endInput.split(":").map(Number);
+        const startDate = new Date(base);
+        startDate.setHours(sh, sm, 0, 0);
+        const endDate = new Date(base);
+        endDate.setHours(eh, em, 0, 0);
+        payload.startTime = startDate;
+        payload.endTime = endDate;
+      }
+
       try {
-        const newTitre = titre.value.trim();
-        const newDesc = desc.value.trim();
-        const recurrence =
-          document.getElementById("recurrence")?.value || "none";
-        if (!newTitre) return showNotif("Titre requis", "err");
-
-        const targetAgendaId = getSelectedAgendaId() || agenda._id;
-        if (!targetAgendaId) return showNotif("Sélectionnez un agenda", "err");
-
-        const startInput = document.getElementById("startTime")?.value;
-        const endInput = document.getElementById("endTime")?.value;
-        if (!validateTimeRange(startInput, endInput)) return;
-        let payload = {
-          titre: newTitre,
-          description: newDesc,
-          recurrence,
-          agendaId: targetAgendaId,
-        };
-        if (startInput && endInput) {
-          const base = rdv.startTime
-            ? new Date(rdv.startTime)
-            : rdv.date
-            ? new Date(rdv.date)
-            : new Date();
-          const [sh, sm] = startInput.split(":").map(Number);
-          const [eh, em] = endInput.split(":").map(Number);
-          const s = new Date(base);
-          s.setHours(sh, sm, 0, 0);
-          const e = new Date(base);
-          e.setHours(eh, em, 0, 0);
-          payload.startTime = s;
-          payload.endTime = e;
-        }
-
         const res = await fetch(`/api/agenda/${agenda._id}/rdv/${rdv._id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -303,14 +310,14 @@ function ouvrirEditionRdv(agenda, rdv) {
   if (delBtn) {
     delBtn.classList.remove("hidden");
     delBtn.onclick = async () => {
-      if (
-        !confirm(
-          `Confirmer la suppression du RDV "${rdv.titre}" dans l'agenda "${agenda.nom}" ?`
-        )
-      )
-        return;
+      const confirmDelete = confirm(
+        `Confirmer la suppression du RDV "${rdv.titre}" dans l'agenda "${agenda.nom}" ?`
+      );
+      if (!confirmDelete) return;
+
+      const deleteUrl = `/api/agenda/${agenda._id}/rdv/${rdv._id}`;
       try {
-        const res = await fetch(`/api/agenda/${agenda._id}/rdv/${rdv._id}`, {
+        const res = await fetch(deleteUrl, {
           method: "DELETE",
           credentials: "include",
         });

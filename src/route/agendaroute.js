@@ -126,7 +126,6 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
 router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   try {
     const { agendaId, rdvId } = req.params;
-    const { date } = req.query;
 
     const agenda = await Agenda.findOne({
       _id: agendaId,
@@ -137,19 +136,7 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
     const rdv = agenda.rdvs.id(rdvId);
     if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
 
-    // CAS 1 : suppression d'une occurrence d'un RDV récurrent
-    if (rdv.recurrence !== "none" && date) {
-      const d = new Date(date);
-
-      if (!rdv.exceptions) rdv.exceptions = [];
-
-      rdv.exceptions.push(d);
-      await agenda.save();
-
-      return res.json({ message: "Occurrence supprimée" });
-    }
-
-    //  CAS 2 : suppression complète du RDV
+    // suppression complète du RDV (recurrence incluse)
     agenda.rdvs = agenda.rdvs.filter((item) => String(item._id) !== rdvId);
     await agenda.save();
 
@@ -250,87 +237,6 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   await destinationAgenda.save();
 
   res.json({ message: "Rendez-vous déplacé" });
-});
-
-// --- U3 EXPORTER un agenda ---
-router.get("/:agendaId/export", isAuthenticated, async (req, res) => {
-  const { agendaId } = req.params;
-
-  const agenda = await Agenda.findOne({
-    _id: agendaId,
-    userId: req.session.userId,
-  });
-
-  if (!agenda) {
-    return res.status(404).json({ message: "Agenda introuvable" });
-  }
-
-  const exportData = {
-    name: agenda.nom,
-    rdvs: agenda.rdvs.map((r) => ({
-      titre: r.titre,
-      description: r.description,
-      date: r.date,
-      startTime: r.startTime,
-      endTime: r.endTime,
-      recurrence: r.recurrence,
-    })),
-  };
-
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename="${agenda.nom}.json"`
-  );
-  res.setHeader("Content-Type", "application/json");
-
-  res.send(JSON.stringify(exportData, null, 2));
-});
-
-// --- U3 IMPORTER un agenda ---
-router.post("/:agendaId/import", isAuthenticated, async (req, res) => {
-  const { agendaId } = req.params;
-  const { rdvs } = req.body;
-
-  const agenda = await Agenda.findOne({
-    _id: agendaId,
-    userId: req.session.userId,
-  });
-
-  if (!agenda) {
-    return res.status(404).json({ message: "Agenda introuvable" });
-  }
-
-  if (!Array.isArray(rdvs)) {
-    return res.status(400).json({ message: "Format d'import invalide" });
-  }
-
-  // Ajout des RDV importés
-  for (const r of rdvs) {
-    const startTime = r.startTime
-      ? new Date(r.startTime)
-      : r.date
-      ? new Date(r.date)
-      : null;
-    const endTime = r.endTime
-      ? new Date(r.endTime)
-      : startTime
-      ? new Date(startTime.getTime() + 60 * 60 * 1000)
-      : null;
-
-    if (!startTime || !endTime) continue; // skip invalid entries
-
-    agenda.rdvs.push({
-      titre: r.titre,
-      description: r.description || "",
-      date: r.date || startTime,
-      startTime,
-      endTime,
-      recurrence: r.recurrence || "none",
-    });
-  }
-
-  await agenda.save();
-  res.json({ message: "Agenda importé avec succès" });
 });
 
 module.exports = router;
