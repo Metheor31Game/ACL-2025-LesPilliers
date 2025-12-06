@@ -148,6 +148,7 @@ function ouvrirEditionRdv(agenda, rdv) {
   if (desc) desc.value = rdv.description || "";
   if (modal) modal.classList.remove("hidden");
   rdvEnEdition = rdv;
+  showTimeError("");
 
   const selectedAgendaId = agenda?._id || null;
   populateAgendaPicker(selectedAgendaId);
@@ -190,6 +191,7 @@ function ouvrirEditionRdv(agenda, rdv) {
 
         const startInput = document.getElementById("startTime")?.value;
         const endInput = document.getElementById("endTime")?.value;
+        if (!validateTimeRange(startInput, endInput)) return;
         let payload = {
           titre: newTitre,
           description: newDesc,
@@ -227,6 +229,7 @@ function ouvrirEditionRdv(agenda, rdv) {
         if (titre) titre.value = "";
         if (desc) desc.value = "";
         rdvEnEdition = null;
+        showTimeError("");
         showNotif("RDV modifié", "ok");
         await chargerAgendas();
       } catch (err) {
@@ -243,6 +246,7 @@ function ouvrirEditionRdv(agenda, rdv) {
       if (titre) titre.value = "";
       if (desc) desc.value = "";
       rdvEnEdition = null;
+      showTimeError("");
       setDefaultSaveAction();
     };
 
@@ -266,6 +270,7 @@ function ouvrirEditionRdv(agenda, rdv) {
         if (titre) titre.value = "";
         if (desc) desc.value = "";
         rdvEnEdition = null;
+        showTimeError("");
         showNotif("RDV supprimé", "ok");
         await chargerAgendas();
       } catch (err) {
@@ -303,6 +308,7 @@ function setDefaultSaveAction() {
 
       if (!titre || !startInput || !endInput)
         return showNotif("Titre et heure requis", "err");
+      if (!validateTimeRange(startInput, endInput)) return;
 
       const [sh, sm] = startInput.split(":").map(Number);
       const [eh, em] = endInput.split(":").map(Number);
@@ -336,6 +342,7 @@ function setDefaultSaveAction() {
         if (descEl) descEl.value = "";
         const modal = document.getElementById("modal");
         if (modal) modal.classList.add("hidden");
+        showTimeError("");
         showNotif("RDV ajouté", "ok");
         await chargerAgendas();
       } catch (err) {
@@ -384,12 +391,42 @@ function getDefaultAgendaId() {
   return agendas[0]?._id || null;
 }
 
+function validateTimeRange(startValue, endValue) {
+  if (!startValue || !endValue) {
+    showTimeError("");
+    return true;
+  }
+  const [sh, sm] = startValue.split(":").map(Number);
+  const [eh, em] = endValue.split(":").map(Number);
+  const startMinutes = sh * 60 + sm;
+  const endMinutes = eh * 60 + em;
+  if (endMinutes <= startMinutes) {
+    showTimeError("L'heure de fin doit être après l'heure de début.");
+    return false;
+  }
+  showTimeError("");
+  return true;
+}
+
+function showTimeError(message) {
+  const errorEl = document.getElementById("timeError");
+  if (!errorEl) return;
+  if (message) {
+    errorEl.textContent = message;
+    errorEl.classList.remove("hidden");
+  } else {
+    errorEl.textContent = "";
+    errorEl.classList.add("hidden");
+  }
+}
+
 function openModalForDate(date) {
   if (typeof date === "string") selectedDateForModal = new Date(date);
   else selectedDateForModal = date;
   const modal = document.getElementById("modal");
   if (modal) modal.classList.remove("hidden");
   populateAgendaPicker();
+  showTimeError("");
   const recur = document.getElementById("recurrence");
   if (recur) recur.value = "none";
   try {
@@ -427,3 +464,17 @@ if (typeof openModalForDate === "function")
   window.openModalForDate = openModalForDate;
 if (typeof ouvrirEditionRdv === "function")
   window.ouvrirEditionRdv = ouvrirEditionRdv;
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter") return;
+  const modal = document.getElementById("modal");
+  if (!modal || modal.classList.contains("hidden")) return;
+  const target = event.target;
+  const isTextarea =
+    target &&
+    (target.tagName === "TEXTAREA" ||
+      target.getAttribute("role") === "textbox");
+  if (isTextarea) return;
+  event.preventDefault();
+  document.getElementById("saveRdv")?.click();
+});

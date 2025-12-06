@@ -191,7 +191,7 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
 
   // remove the rdv from this agenda
-  rdv.remove();
+  agenda.rdvs = agenda.rdvs.filter((item) => String(item._id) !== rdvId);
   await agenda.save();
 
   res.json({ message: "Rendez-vous supprimé" });

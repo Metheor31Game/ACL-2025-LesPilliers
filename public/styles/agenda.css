@@ -119,6 +119,14 @@ body {
   margin-top: 0.5rem;
 }
 
+#timeError {
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-style: italic;
+  margin-top: -4px;
+  transition: opacity 120ms ease;
+}
+
 /* Agenda picker inside modal */
 .agenda-picker {
   display: flex;
