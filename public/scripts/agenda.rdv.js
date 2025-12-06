@@ -149,26 +149,8 @@ function ouvrirEditionRdv(agenda, rdv) {
   if (modal) modal.classList.remove("hidden");
   rdvEnEdition = rdv;
 
-  try {
-    let initial = [];
-    if (rdv.sharedId) {
-      const sid = rdv.sharedId.toString();
-      agendas.forEach((a) => {
-        if (
-          (a.rdvs || []).some(
-            (r) => r.sharedId && r.sharedId.toString() === sid
-          )
-        ) {
-          initial.push(a._id);
-        }
-      });
-    } else {
-      initial = [agenda._id];
-    }
-    populateAgendaPicker(initial);
-  } catch (e) {
-    populateAgendaPicker([agenda._id]);
-  }
+  const selectedAgendaId = agenda?._id || null;
+  populateAgendaPicker(selectedAgendaId);
 
   const recur = document.getElementById("recurrence");
   if (recur) recur.value = rdv.recurrence || "none";
@@ -203,15 +185,8 @@ function ouvrirEditionRdv(agenda, rdv) {
           document.getElementById("recurrence")?.value || "none";
         if (!newTitre) return showNotif("Titre requis", "err");
 
-        const picker = document.querySelectorAll(
-          "#agendaPickerList input[type=checkbox]"
-        );
-        let agendaIds = [];
-        if (picker && picker.length) {
-          agendaIds = Array.from(picker)
-            .filter((c) => c.checked)
-            .map((c) => c.value);
-        }
+        const targetAgendaId = getSelectedAgendaId() || agenda._id;
+        if (!targetAgendaId) return showNotif("Sélectionnez un agenda", "err");
 
         const startInput = document.getElementById("startTime")?.value;
         const endInput = document.getElementById("endTime")?.value;
@@ -219,7 +194,7 @@ function ouvrirEditionRdv(agenda, rdv) {
           titre: newTitre,
           description: newDesc,
           recurrence,
-          agendaIds,
+          agendaId: targetAgendaId,
         };
         if (startInput && endInput) {
           const base = rdv.startTime
@@ -277,26 +252,9 @@ function ouvrirEditionRdv(agenda, rdv) {
     delBtn.onclick = async () => {
       if (!confirm("Supprimer ce RDV ?")) return;
       try {
-        const picker = document.querySelectorAll(
-          "#agendaPickerList input[type=checkbox]"
-        );
-        let agendaIds = [];
-        if (picker && picker.length) {
-          agendaIds = Array.from(picker)
-            .filter((c) => c.checked)
-            .map((c) => c.value);
-        }
-        if (!agendaIds || agendaIds.length === 0) agendaIds = [agenda._id];
-
-        const payload = { agendaIds };
-        if (rdv.sharedId) payload.sharedId = rdv.sharedId.toString();
-        else payload.rdvId = rdv._id;
-
-        const res = await fetch(`/api/agenda/rdv/delete`, {
-          method: "POST",
+        const res = await fetch(`/api/agenda/${agenda._id}/rdv/${rdv._id}`, {
+          method: "DELETE",
           credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const err = await res.text();
@@ -328,21 +286,8 @@ function setDefaultSaveAction() {
   rdvEnEdition = null;
   if (saveBtn)
     saveBtn.onclick = async () => {
-      const picker = document.querySelectorAll(
-        "#agendaPickerList input[type=checkbox]"
-      );
-      let agendaIds = [];
-      if (picker && picker.length) {
-        agendaIds = Array.from(picker)
-          .filter((c) => c.checked)
-          .map((c) => c.value);
-      }
-      if (!agendaIds || agendaIds.length === 0) {
-        for (const a of agendas)
-          if (visibleAgendas[a._id] !== false) agendaIds.push(a._id);
-        if (agendaIds.length === 0 && agendas[0])
-          agendaIds.push(agendas[0]._id);
-      }
+      const targetAgendaId = getSelectedAgendaId() || getDefaultAgendaId();
+      if (!targetAgendaId) return showNotif("Sélectionnez un agenda", "err");
 
       const titre = document.getElementById("titre").value.trim();
       const description = document.getElementById("desc").value.trim();
@@ -356,13 +301,6 @@ function setDefaultSaveAction() {
         : null;
       if (!baseDate) baseDate = new Date();
 
-      console.log("[agenda] creating RDV payload values", {
-        titre,
-        baseDate,
-        startInput,
-        endInput,
-        agendaIds,
-      });
       if (!titre || !startInput || !endInput)
         return showNotif("Titre et heure requis", "err");
 
@@ -374,7 +312,7 @@ function setDefaultSaveAction() {
       endTime.setHours(eh, em, 0, 0);
 
       try {
-        const res = await fetch(`/api/agenda/${agendaIds[0]}/rdv`, {
+        const res = await fetch(`/api/agenda/${targetAgendaId}/rdv`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
@@ -383,7 +321,7 @@ function setDefaultSaveAction() {
             description,
             startTime,
             endTime,
-            agendaIds,
+            agendaId: targetAgendaId,
             recurrence,
           }),
         });
@@ -408,28 +346,42 @@ function setDefaultSaveAction() {
 }
 
 // build/populate the agenda picker UI inside the modal
-function populateAgendaPicker(initialCheckedIds = []) {
+function populateAgendaPicker(initialAgendaId = null) {
   const container = document.getElementById("agendaPickerList");
   if (!container) return;
   container.innerHTML = "";
-  agendas.forEach((a, idx) => {
+
+  const defaultId = initialAgendaId || getDefaultAgendaId();
+
+  agendas.forEach((a) => {
     const id = a._id;
     const label = document.createElement("label");
     label.className = "flex items-center gap-2";
-    const cb = document.createElement("input");
-    cb.type = "checkbox";
-    cb.value = id;
-    if (initialCheckedIds && initialCheckedIds.length > 0) {
-      cb.checked = initialCheckedIds.includes(id);
-    } else {
-      cb.checked = visibleAgendas[id] !== false;
-    }
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = "agendaPicker";
+    radio.value = id;
+    radio.checked = id === defaultId;
     const span = document.createElement("span");
     span.textContent = a.nom;
-    label.appendChild(cb);
+    label.appendChild(radio);
     label.appendChild(span);
     container.appendChild(label);
   });
+}
+
+function getSelectedAgendaId() {
+  const checked = document.querySelector(
+    "#agendaPickerList input[type=radio]:checked"
+  );
+  return checked ? checked.value : null;
+}
+
+function getDefaultAgendaId() {
+  for (const a of agendas) {
+    if (visibleAgendas[a._id] !== false) return a._id;
+  }
+  return agendas[0]?._id || null;
 }
 
 function openModalForDate(date) {

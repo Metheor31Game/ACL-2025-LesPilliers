@@ -3,8 +3,8 @@
  * - GET  /api/agenda/               -> list user's agendas
  * - POST /api/agenda/               -> create agenda
  * - PATCH/DELETE /api/agenda/:agendaId -> rename / delete agenda
- * - POST  /api/agenda/:agendaId/rdv  -> create RDV (supports multi-agenda via agendaIds)
- * - PATCH /api/agenda/:agendaId/rdv/:rdvId -> update RDV (supports sync across agendas)
+ * - POST  /api/agenda/:agendaId/rdv  -> create RDV
+ * - PUT   /api/agenda/:agendaId/rdv/:rdvId -> update/move RDV
  * - DELETE /api/agenda/:agendaId/rdv/:rdvId -> delete single RDV from one agenda
  * - POST /api/agenda/rdv/delete     -> delete RDV copies across multiple agendas
  */
@@ -235,26 +235,58 @@ router.post("/rdv/delete", isAuthenticated, async (req, res) => {
 // --- MODIFICATION D'UN RDV ---
 router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
   const { agendaId, rdvId } = req.params;
-  const { titre, description, date, startTime, endTime, recurrence } = req.body;
+  const {
+    titre,
+    description,
+    date,
+    startTime,
+    endTime,
+    recurrence,
+    agendaId: nextAgendaId,
+  } = req.body;
 
-  const agenda = await Agenda.findOne({
+  const sourceAgenda = await Agenda.findOne({
     _id: agendaId,
     userId: req.session.userId,
   });
-  if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
+  if (!sourceAgenda)
+    return res.status(404).json({ message: "Agenda introuvable" });
 
-  const rdv = agenda.rdvs.id(rdvId);
+  const rdv = sourceAgenda.rdvs.id(rdvId);
   if (!rdv) return res.status(404).json({ message: "RDV introuvable" });
 
-  if (titre) rdv.titre = titre;
-  if (description) rdv.description = description;
-  if (date) rdv.date = date;
-  if (startTime) rdv.startTime = startTime;
-  if (endTime) rdv.endTime = endTime;
-  if (recurrence) rdv.recurrence = recurrence;
+  const targetAgendaId = nextAgendaId || agendaId;
+  const updatedRdv = {
+    titre: titre !== undefined ? titre : rdv.titre,
+    description: description !== undefined ? description : rdv.description,
+    date: date !== undefined ? date : rdv.date,
+    startTime: startTime !== undefined ? startTime : rdv.startTime,
+    endTime: endTime !== undefined ? endTime : rdv.endTime,
+    recurrence: recurrence !== undefined ? recurrence : rdv.recurrence,
+  };
 
-  await agenda.save();
-  res.json({ message: "Rendez-vous modifié" });
+  if (targetAgendaId === agendaId) {
+    Object.assign(rdv, updatedRdv);
+    await sourceAgenda.save();
+    return res.json({ message: "Rendez-vous modifié" });
+  }
+
+  const destinationAgenda = await Agenda.findOne({
+    _id: targetAgendaId,
+    userId: req.session.userId,
+  });
+  if (!destinationAgenda)
+    return res.status(404).json({ message: "Nouvel agenda introuvable" });
+
+  sourceAgenda.rdvs = sourceAgenda.rdvs.filter(
+    (item) => String(item._id) !== String(rdvId)
+  );
+  await sourceAgenda.save();
+
+  destinationAgenda.rdvs.push(updatedRdv);
+  await destinationAgenda.save();
+
+  res.json({ message: "Rendez-vous déplacé" });
 });
 
 // --- U3 EXPORTER un agenda ---
