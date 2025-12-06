@@ -264,6 +264,10 @@ document.getElementById("nextWeek")?.addEventListener("click", () => {
   currentWeekStart.setDate(currentWeekStart.getDate() + 7);
   renderAgendaSemaine();
 });
+document.getElementById("todayWeek")?.addEventListener("click", () => {
+  currentWeekStart = getMonday(new Date());
+  renderAgendaSemaine();
+});
 
 // actions boutons statiques (ajout agenda, ajout rdv, logout)
 document.getElementById("btnAddAgenda")?.addEventListener("click", async () => {
