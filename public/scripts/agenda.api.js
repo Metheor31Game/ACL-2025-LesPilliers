@@ -142,6 +142,15 @@ window.agendaApi = (function () {
     return true;
   }
 
+  async function shareAgendaApi(agendaId, userId, rights) {
+    return shareAgenda(agendaId, userId, rights);
+  }
+
+  async function joinAgendaApi(code, userId) {
+    return joinAgenda(code, userId);
+  }
+
+
   return {
     getAgendas,
     creerAgenda,
@@ -153,5 +162,7 @@ window.agendaApi = (function () {
     exportAgenda,
     importAgenda,
     updateAccount,
+    shareAgendaApi,
+    joinAgendaApi,
   };
 })();
