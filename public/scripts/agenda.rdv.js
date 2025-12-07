@@ -74,95 +74,80 @@ function renderAgendaSemaine() {
       const dt = new Date(jour);
       dt.setHours(h, 0, 0, 0);
       dayCell.setAttribute("data-datetime", dt.toISOString());
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      if (jour.getTime() === today.getTime()) {
-        dayCell.classList.add("today-day");
-      }
 
-      // Populate RDVs avec gestion des RDVs concurrents
+      const displayedRdvKeys = new Set();
       let rdvsPourCell = [];
+
       agendas.forEach((agenda, idx) => {
         if (!visibleAgendas[agenda._id]) return;
         const color = colors[idx % colors.length];
-
-        const rdvsAgenda = (agenda.rdvs || []).filter((r) => {
+      
+        (agenda.rdvs || []).forEach((r) => {
           const rdvDate = new Date(r.date || r.startTime);
           const original = new Date(r.startTime || r.date);
-          if (dt < original) return false;
-
+          if (dt < original) return;
+        
           const exact =
             rdvDate.getFullYear() === dt.getFullYear() &&
             rdvDate.getMonth() === dt.getMonth() &&
             rdvDate.getDate() === dt.getDate() &&
             rdvDate.getHours() === dt.getHours();
-          const daily =
-            r.recurrence === "daily" && rdvDate.getHours() === dt.getHours();
-          const weekly =
-            r.recurrence === "weekly" &&
-            rdvDate.getDay() === dt.getDay() &&
-            rdvDate.getHours() === dt.getHours();
-          const monthly =
-            r.recurrence === "monthly" &&
-            rdvDate.getDate() === dt.getDate() &&
-            rdvDate.getHours() === dt.getHours();
-          const yearly =
-            r.recurrence === "yearly" &&
-            rdvDate.getDate() === dt.getDate() &&
-            rdvDate.getMonth() === dt.getMonth() &&
-            rdvDate.getHours() === dt.getHours();
-
-          return exact || daily || weekly || monthly || yearly;
-        });
-
-        rdvsAgenda.forEach((rdv) => {
-          rdvsPourCell.push({ rdv, agenda, color });
+          const daily = r.recurrence === "daily" && rdvDate.getHours() === dt.getHours();
+          const weekly = r.recurrence === "weekly" && rdvDate.getDay() === dt.getDay() && rdvDate.getHours() === dt.getHours();
+          const monthly = r.recurrence === "monthly" && rdvDate.getDate() === dt.getDate() && rdvDate.getHours() === dt.getHours();
+          const yearly = r.recurrence === "yearly" && rdvDate.getDate() === dt.getDate() && rdvDate.getMonth() === dt.getMonth() && rdvDate.getHours() === dt.getHours();
+        
+          if (!(exact || daily || weekly || monthly || yearly)) return;
+        
+          const key = r._id + "_" + dt.getHours();
+          if (displayedRdvKeys.has(key)) return;
+          displayedRdvKeys.add(key);
+        
+          rdvsPourCell.push({ rdv: r, agenda, color });
         });
       });
-
+    
       // Affichage des RDVs concurrents
       rdvsPourCell.forEach(({ rdv, agenda, color }, i) => {
         const el = document.createElement("div");
         el.className = "rdv";
         el.style.background = color;
         el.title = `${agenda.nom} — ${rdv.titre}\n${rdv.description || ""}`;
-
+      
         const recurringLabel = recurrenceLabel(rdv);
         const start = new Date(rdv.startTime || rdv.date);
-        const end = rdv.endTime
-          ? new Date(rdv.endTime)
-          : new Date(start.getTime() + 60 * 60 * 1000);
+        const end = rdv.endTime ? new Date(rdv.endTime) : new Date(start.getTime() + 60 * 60 * 1000);
         const durationMin = Math.max(15, (end - start) / (1000 * 60));
-
+      
         el.innerHTML =
           `<strong>${rdv.titre}${recurringLabel}</strong>` +
           `<div class="text-xs">${timeStr(start)} - ${timeStr(end)}</div>`;
-
+      
         const cellHeight = dayCell.offsetHeight || 60;
         const minuteOffset = start.getMinutes() || 0;
         const topPx = Math.round((minuteOffset / 60) * cellHeight) + 4;
         const heightPx = Math.round((durationMin / 60) * cellHeight) - 8;
-
+      
         el.style.top = `${topPx}px`;
         el.style.height = `${Math.max(18, heightPx)}px`;
         el.style.bottom = "auto";
         el.style.zIndex = 5;
-
-        // largeur et position pour RDVs concurrents
+      
         const concurrents = rdvsPourCell.length;
         const widthPercent = 100 / concurrents;
         el.style.width = `calc(${widthPercent}% - 2px)`;
         el.style.left = `calc(${i * widthPercent}% + 1px)`;
-
+      
         el.onclick = (ev) => {
           ev.stopPropagation();
           ouvrirEditionRdv(agenda, rdv);
         };
         dayCell.appendChild(el);
       });
-
+    
       grid.appendChild(dayCell);
     });
+      
   }
 
   container.appendChild(grid);
