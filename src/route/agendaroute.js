@@ -19,7 +19,12 @@ const generateRecurrences = require("../utils/generateRecurrences");
 
 // rdv recurrence types: none, weekly, monthly, yearly
 router.get("/", isAuthenticated, async (req, res) => {
-  const agendas = await Agenda.find({ userId: req.session.userId });
+  const agendas = await Agenda.find({
+    $or: [
+      { userId: req.session.userId },               // agendas possédés
+      { 'sharedWith.userId': req.session.userId }  // agendas partagés avec lui
+    ]
+  });
 
   // Semaine demandée par le front (param ?week=YYYY-MM-DD)
   const weekParam = req.query.week;
@@ -41,6 +46,7 @@ router.get("/", isAuthenticated, async (req, res) => {
     const generated = generateRecurrences(agenda.rdvs, monday, sunday);
 
     a.rdvs = [...agenda.rdvs, ...generated];
+    a.isShared = agenda.userId.toString() !== req.session.userId.toString();
     return a;
   });
 
@@ -62,6 +68,29 @@ router.post("/", isAuthenticated, async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
+router.get("/my-agendas", isAuthenticated, async (req, res) => {
+  try {
+    const agendas = await Agenda.find({
+      $or: [
+        { userId: req.session.userId },
+        { "sharedWith.userId": req.session.userId }
+      ]
+    });
+
+    const result = agendas.map(a => ({
+      _id: a._id,
+      nom: a.nom,
+      isShared: a.userId.toString() !== req.session.userId.toString()
+    }));
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send("Erreur serveur");
+  }
+});
+
 
 // rename an agenda
 router.patch("/:agendaId", isAuthenticated, async (req, res) => {

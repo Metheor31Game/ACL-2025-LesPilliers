@@ -12,6 +12,7 @@ const agendaSchema = new mongoose.Schema({
       code: { type: String }, // code de partage temporaire
     },
   ],
+   default: [],
 });
 
 module.exports = mongoose.model("Agenda", agendaSchema);
