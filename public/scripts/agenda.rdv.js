@@ -186,6 +186,227 @@ function renderAgendaSemaine() {
   attachGridSlotHandlers();
 }
 
+function getRdvsForDay(dayDate) {
+    const rdvs = [];
+    agendas.forEach((agenda, idx) => {
+        if (!visibleAgendas[agenda._id]) return;
+        const color = colors[idx % colors.length];
+
+        (agenda.rdvs || []).forEach((rdv) => {
+            const originalStart = new Date(rdv.startTime || rdv.date);
+            const originalEnd = rdv.endTime ? new Date(rdv.endTime) : new Date(originalStart.getTime() + 60 * 60 * 1000);
+
+            // Verifier si ce RDV match le jour (exact ou recurrent)
+            const matchesDay = (testDate) => {
+                if (rdv.recurrence === 'none') {
+                    return testDate.getFullYear() === dayDate.getFullYear() &&
+                        testDate.getMonth() === dayDate.getMonth() &&
+                        testDate.getDate() === dayDate.getDate();
+                } else if (rdv.recurrence === 'daily') return true;
+                else if (rdv.recurrence === 'weekly') return testDate.getDay() === dayDate.getDay();
+                else if (rdv.recurrence === 'monthly') return testDate.getDate() === dayDate.getDate();
+                else if (rdv.recurrence === 'yearly') return testDate.getDate() === dayDate.getDate() && testDate.getMonth() === dayDate.getMonth();
+                return false;
+            };
+
+            if (matchesDay(originalStart) && originalStart <= dayDate) { // Seulement après date origine
+                // Créer instance pour ce jour
+                const instanceStart = new Date(dayDate);
+                instanceStart.setHours(originalStart.getHours(), originalStart.getMinutes(), 0, 0);
+                const instanceEnd = new Date(dayDate);
+                instanceEnd.setHours(originalEnd.getHours(), originalEnd.getMinutes(), 0, 0);
+
+                if (instanceEnd <= instanceStart) instanceEnd.setDate(instanceEnd.getDate() + 1); // Si fin après minuit, mais rare
+
+                rdvs.push({
+                    ...rdv,
+                    startTime: instanceStart,
+                    endTime: instanceEnd,
+                    agendaId: agenda._id,
+                    agendaNom: agenda.nom,
+                    color: color
+                });
+            }
+        });
+    });
+
+    // Trier par startTime
+    rdvs.sort((a, b) => new Date(a.startTime) - new Date(b.startTime));
+    return rdvs;
+}
+
+// Assign columns pour gerer chevauchements
+function assignColumns(rdvs) {
+    const columns = []; // Chaque colonne: { lastEnd: Date }
+    rdvs.forEach((rdv) => {
+        let assigned = false;
+        for (let i = 0; i < columns.length; i++) {
+            if (columns[i].lastEnd <= new Date(rdv.startTime)) {
+                rdv.column = i;
+                columns[i].lastEnd = new Date(rdv.endTime);
+                assigned = true;
+                break;
+            }
+        }
+        if (!assigned) {
+            rdv.column = columns.length;
+            columns.push({ lastEnd: new Date(rdv.endTime) });
+        }
+    });
+    const maxCols = columns.length || 1;
+    rdvs.forEach((rdv) => {
+        rdv.maxCols = maxCols;
+    });
+    return rdvs;
+}
+
+function renderAgendaSemaine() {
+    const container = document.getElementById("agendaContainer");
+    if (!container) return;
+    container.innerHTML = "";
+    container.className = "agenda-container";
+
+    const startHour = 8;
+    const endHour = 20;
+    const hourCount = endHour - startHour + 1;
+    const cellHeight = 60; // px par heure
+    const totalHeight = hourCount * cellHeight;
+
+    const jours = Array.from({ length: 7 }).map((_, i) => {
+        const d = new Date(currentWeekStart);
+        d.setDate(currentWeekStart.getDate() + i);
+        return d;
+    });
+
+    // Header des jours
+    const header = document.createElement("div");
+    header.className = "week-header";
+    const timeHeader = document.createElement("div");
+    timeHeader.className = "time-header";
+    timeHeader.textContent = "";
+    header.appendChild(timeHeader);
+
+    jours.forEach((jour) => {
+        const h = document.createElement("div");
+        const dayName = document.createElement("span");
+        dayName.textContent = jour.toLocaleDateString("fr-FR", { weekday: "short" });
+        const dayNum = document.createElement("span");
+        dayNum.className = "day-num";
+        dayNum.textContent = jour.getDate();
+        h.appendChild(dayName);
+        h.appendChild(dayNum);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (jour.getTime() === today.getTime()) h.classList.add("today");
+        header.appendChild(h);
+    });
+    container.appendChild(header);
+
+    // Grille des colonnes jours
+    const grid = document.createElement("div");
+    grid.className = "week-grid";
+
+    // Colonne des labels heures
+    const hourLabels = document.createElement("div");
+    hourLabels.className = "hour-labels";
+    for (let h = startHour; h <= endHour; h++) {
+        const label = document.createElement("div");
+        label.className = "hour-label";
+        label.style.top = `${(h - startHour) * cellHeight}px`;
+        label.style.height = `${cellHeight}px`;
+        label.textContent = `${String(h).padStart(2, "0")}h`;
+        hourLabels.appendChild(label);
+    }
+    grid.appendChild(hourLabels);
+
+    // Lignes horizontales pour heures
+    const hourLines = document.createElement("div");
+    hourLines.className = "hour-lines";
+    for (let h = startHour + 1; h <= endHour; h++) { // Pas de ligne au top
+        const line = document.createElement("div");
+        line.className = "hour-line";
+        line.style.top = `${(h - startHour) * cellHeight}px`;
+        hourLines.appendChild(line);
+    }
+    grid.appendChild(hourLines);
+
+    // Colonnes jours
+    jours.forEach((jour) => {
+        const dayColumn = document.createElement("div");
+        dayColumn.className = "day-column";
+        dayColumn.style.height = `${totalHeight}px`;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (jour.getTime() === today.getTime()) dayColumn.classList.add("today-column");
+
+        // Collecter et assigner colonnes aux RDV pour ce jour
+        let dayRdvs = getRdvsForDay(jour);
+        dayRdvs = assignColumns(dayRdvs);
+
+        dayRdvs.forEach((rdv) => {
+            const el = document.createElement("div");
+            el.className = "rdv";
+            el.style.background = rdv.color;
+            el.title = `${rdv.agendaNom} — ${rdv.titre}\n${rdv.description || ""}`;
+            const recurringLabel = recurrenceLabel(rdv);
+            const start = new Date(rdv.startTime);
+            const end = new Date(rdv.endTime);
+            const durationMin = (end - start) / (1000 * 60);
+
+            el.innerHTML = `<strong>${rdv.titre}${recurringLabel}</strong><div class="text-xs">${timeStr(start)} - ${timeStr(end)}</div>`;
+
+            // Position verticale
+            const startOffsetHours = start.getHours() - startHour + start.getMinutes() / 60;
+            const topPx = startOffsetHours * cellHeight;
+            const heightPx = (durationMin / 60) * cellHeight;
+            el.style.top = `${topPx}px`;
+            el.style.height = `${Math.max(18, heightPx)}px`;
+
+            // Position horizontale (chevauchements)
+            const widthPercent = 100 / rdv.maxCols;
+            const leftPercent = (rdv.column * widthPercent);
+            el.style.left = `${leftPercent}%`;
+            el.style.width = `${widthPercent}%`;
+            el.style.right = "auto"; // Override inset
+
+            el.onclick = (ev) => {
+                ev.stopPropagation();
+                ouvrirEditionRdv(agendas.find(a => a._id === rdv.agendaId), rdv);
+            };
+
+            dayColumn.appendChild(el);
+        });
+
+        // Handler pour cliquer sur la colonne
+        dayColumn.onclick = (ev) => {
+            const rect = dayColumn.getBoundingClientRect();
+            const clickY = ev.clientY - rect.top;
+            const hourOffset = Math.floor(clickY / cellHeight);
+            const minuteOffset = Math.round((clickY % cellHeight) / cellHeight * 60);
+            const clickedDate = new Date(jour);
+            clickedDate.setHours(startHour + hourOffset, minuteOffset, 0, 0);
+            openModalForDate(clickedDate);
+        };
+
+        grid.appendChild(dayColumn);
+    });
+
+    container.appendChild(grid);
+
+    // maj du mois/annee
+    const monthEl = document.getElementById("monthYear");
+    if (monthEl) {
+        const start = jours[0];
+        const end = jours[6];
+        const opts = { month: "long", year: "numeric" };
+        if (start.getMonth() === end.getMonth()) {
+            monthEl.textContent = start.toLocaleDateString("fr-FR", opts);
+        } else {
+            monthEl.textContent = `${start.toLocaleDateString("fr-FR", { month: "long" })} - ${end.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}`;
+        }
+    }
+}
+
 // édition RDV : ouvrir modal prérempli + supprimer/sauvegarder
 function ouvrirEditionRdv(agenda, rdv) {
   const modal = document.getElementById("modal");

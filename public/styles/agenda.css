@@ -2,6 +2,114 @@ body {
   padding: 10px;
 }
 
+.agenda-container {
+    position: relative;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.week-header {
+    display: flex;
+    background: #f3f4f6;
+    border-bottom: 1px solid #ddd;
+}
+
+.week-header div {
+    flex: 1;
+    text-align: center;
+    font-weight: 600;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+}
+
+.week-header .time-header {
+    width: 80px;
+    flex: none;
+}
+
+.week-grid {
+    display: flex;
+    position: relative;
+}
+
+.day-column {
+    flex: 1;
+    position: relative;
+    height: calc((20 - 8 + 1) * 60px);
+    border-right: 1px solid #eee;
+}
+
+.day-column:last-child {
+    border-right: none;
+}
+
+.hour-lines {
+    position: absolute;
+    top: 0;
+    left: 80px;
+    right: 0;
+    height: 100%;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.hour-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #eee;
+}
+
+.hour-labels {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 80px;
+    height: 100%;
+    z-index: 2;
+}
+
+.hour-label {
+    position: absolute;
+    width: 100%;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.rdv {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 6px;
+    padding: 2px 4px;
+    overflow: hidden;
+    z-index: 5;
+    cursor: pointer;
+}
+
+.rdv:hover {
+    filter: brightness(1.05);
+}
+
+.today-column {
+    background: linear-gradient(90deg, rgba(37, 99, 235, 0.06), transparent);
+}
+
+@media (max-width: 700px) {
+    .week-header div {
+        font-size: 0.9rem;
+    }
+    .day-column {
+        min-width: 80px;
+    }
+}
+
 .week-grid {
   display: grid;
   grid-template-columns: 80px repeat(7, 1fr);
