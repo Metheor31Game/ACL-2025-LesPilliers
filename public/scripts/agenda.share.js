@@ -140,6 +140,7 @@ function initAgendaSharing() {
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         alert(`Vous avez rejoint l'agenda ${data.agendaId} avec droits : ${data.rights}`);
+        window.location.reload();
       }
     } catch (err) {
       console.error(err);
