@@ -32,7 +32,41 @@ router.post('/:agendaId/share', authMiddleware, async (req, res) => {
 // Rejoindre un agenda via code
 router.post('/join', authMiddleware, async (req, res) => {
   const { code } = req.body;
+  try {router.post('/join', authMiddleware, async (req, res) => {
+  const { code } = req.body;
   try {
+    const agenda = await Agenda.findOne({ 'sharedWith.code': code });
+    if (!agenda) return res.status(404).send('Code invalide');
+
+    const entry = agenda.sharedWith.find(e => e.code === code);
+
+    // Vérifie si l'utilisateur B n'est pas déjà ajouté
+    let existing = agenda.sharedWith.find(
+      e => e.userId?.toString() === req.session.userId.toString()
+    );
+
+    if (!existing) {
+      // Ajoute correctement l’utilisateur
+      agenda.sharedWith.push({
+        userId: req.session.userId,
+        rights: entry.rights
+      });W9ONN6
+    } else {
+      // Met à jour les droits si nécessaire
+      existing.rights = entry.rights;
+    }
+
+    // Supprime l’entrée temporaire contenant le code
+    agenda.sharedWith = agenda.sharedWith.filter(e => e.code !== code);
+
+    await agenda.save();
+
+    res.json({ agendaId: agenda._id, rights: entry.rights });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Erreur serveur');
+  }
+});
     const agenda = await Agenda.findOne({ 'sharedWith.code': code });
     if (!agenda) return res.status(404).send('Code invalide');
 

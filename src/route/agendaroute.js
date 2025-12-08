@@ -19,10 +19,11 @@ const generateRecurrences = require("../utils/generateRecurrences");
 
 // rdv recurrence types: none, weekly, monthly, yearly
 router.get("/", isAuthenticated, async (req, res) => {
+  const userId = new mongoose.Types.ObjectId(req.session.userId);
   const agendas = await Agenda.find({
     $or: [
-      { userId: req.session.userId },               // agendas possédés
-      { 'sharedWith.userId': req.session.userId }  // agendas partagés avec lui
+      { userId },               // agendas possédés
+      { 'sharedWith.userId': userId }  // agendas partagés avec lui
     ]
   });
 
