@@ -98,7 +98,13 @@ router.patch("/:agendaId", isAuthenticated, async (req, res) => {
   const { nom } = req.body;
   try {
     const agenda = await Agenda.findOneAndUpdate(
-      { _id: req.params.agendaId, userId: req.session.userId },
+      { 
+        _id: req.params.agendaId,
+        $or: [
+          { userId: req.session.userId },
+          { "sharedWith.userId": req.session.userId, "sharedWith.rights": "modification" }
+        ]
+      },
       { $set: { nom } },
       { new: true }
     );
@@ -114,7 +120,10 @@ router.delete("/:agendaId", isAuthenticated, async (req, res) => {
   try {
     const agenda = await Agenda.findOneAndDelete({
       _id: req.params.agendaId,
-      userId: req.session.userId,
+      $or: [
+        { userId: req.session.userId },
+        { "sharedWith.userId": req.session.userId, "sharedWith.rights": "modification" }
+      ],
     });
     if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
     res.json({ message: "Agenda supprimé" });
@@ -133,7 +142,10 @@ router.post("/:agendaId/rdv", isAuthenticated, async (req, res) => {
 
   const agenda = await Agenda.findOne({
     _id: req.params.agendaId,
-    userId: req.session.userId,
+    $or: [
+        { userId: req.session.userId },
+        { "sharedWith.userId": req.session.userId, "sharedWith.rights": "modification" }
+      ],
   });
 
   if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
@@ -159,7 +171,10 @@ router.delete("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
     const agenda = await Agenda.findOne({
       _id: agendaId,
-      userId: req.session.userId,
+      $or: [
+        { userId: req.session.userId },
+        { "sharedWith.userId": req.session.userId, "sharedWith.rights": "modification" }
+      ],
     });
     if (!agenda) return res.status(404).json({ message: "Agenda introuvable" });
 
@@ -227,7 +242,10 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
   const sourceAgenda = await Agenda.findOne({
     _id: agendaId,
-    userId: req.session.userId,
+    $or: [
+        { userId: req.session.userId },
+        { "sharedWith.userId": req.session.userId, "sharedWith.rights": "modification" }
+      ],
   });
   if (!sourceAgenda)
     return res.status(404).json({ message: "Agenda introuvable" });
@@ -253,7 +271,10 @@ router.put("/:agendaId/rdv/:rdvId", isAuthenticated, async (req, res) => {
 
   const destinationAgenda = await Agenda.findOne({
     _id: targetAgendaId,
-    userId: req.session.userId,
+    $or: [
+      { userId: req.session.userId },
+      { "sharedWith.userId": req.session.userId, "sharedWith.rights": "modification" }
+    ],
   });
   if (!destinationAgenda)
     return res.status(404).json({ message: "Nouvel agenda introuvable" });
