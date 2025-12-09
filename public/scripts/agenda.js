@@ -25,7 +25,7 @@ function showPopupNotif(text, type = "info", ms = 1000) {
   if (!modal || !card || !txt) return;
 
   // Couleur selon le type
-  if (type === "ok") card.style.background = "#ec4899"; // rose
+  if (type === "ok") card.style.background = "#22c55e"; // rose
   else if (type === "err" || type === "error") card.style.background = "#ef4444"; // rouge
   else card.style.background = "#facc15"; // jaune
 
