@@ -11,6 +11,7 @@ const testRoutes = require("./route/testroute");
 const agendaRoutes = require("./route/agendaroute");
 const agendaExportRoutes = require("./route/agenda.export");
 const agendaImportRoutes = require("./route/agenda.import");
+const agendaShareRoutes = require("./route/agenda.share.route");
 
 const app = express();
 const PORT = 3000;
@@ -35,6 +36,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/agenda", agendaRoutes);
 app.use("/api/agenda", agendaExportRoutes);
 app.use("/api/agenda", agendaImportRoutes);
+app.use("/api/agenda", agendaShareRoutes);
 app.use("/api/test", testRoutes);
 
 // Connexion à MongoDB

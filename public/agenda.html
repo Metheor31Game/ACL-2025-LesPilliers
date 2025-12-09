@@ -172,6 +172,32 @@
                 accept="application/json"
               />
             </label>
+
+            <button id="shareAgendaBtn" class="btn btn-primary">
+              Partager / Rejoindre
+            </button>
+
+          </div>
+
+          <div id="shareModal" class="fixed inset-0 modal-overlay hidden">
+            <div class="modal-card">
+              <h2 class="modal-title">Partager / Rejoindre un agenda</h2>
+            
+              <label for="shareAction" class="note">Action</label>
+              <select id="shareAction" class="input mb-3">
+                <option value="share">Partager un agenda</option>
+                <option value="join">Rejoindre via code</option>
+              </select>
+            
+              <div id="shareFields">
+                <!-- Les champs seront générés dynamiquement par JS -->
+              </div>
+            
+              <div class="modal-actions">
+                <button id="shareSubmit" class="btn btn-primary">Valider</button>
+                <button id="shareCancel" class="btn btn-ghost">Annuler</button>
+              </div>
+            </div>
           </div>
 
           <div id="agendaContainer" class="grid-container mb-6"></div>
@@ -306,5 +332,6 @@
     <script src="/scripts/agenda.rdv.js"></script>
     <script src="/scripts/agenda.recherche.js"></script>
     <script src="/scripts/agenda.main.js"></script>
+    <script src="/scripts/agenda.share.js"></script>
   </body>
 </html>
