@@ -2,8 +2,8 @@
 (function attachImportExport() {
   const exportBtn = document.getElementById("exportAgenda");
   const notify = (msg, type = "info") => {
-    if (typeof showNotif === "function") {
-      showNotif(msg, type === "error" ? "err" : type === "ok" ? "ok" : "info");
+    if (typeof showPopupNotif === "function") {
+      showPopupNotif(msg, type === "error" ? "err" : type === "ok" ? "ok" : "info");
     } else {
       alert(msg);
     }

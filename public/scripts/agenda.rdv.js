@@ -186,7 +186,6 @@ function renderAgendaSemaine() {
   attachGridSlotHandlers();
 }
 
-// édition RDV : ouvrir modal prérempli + supprimer/sauvegarder
 function ouvrirEditionRdv(agenda, rdv) {
   const modal = document.getElementById("modal");
   const titre = document.getElementById("titre");
@@ -236,12 +235,12 @@ function ouvrirEditionRdv(agenda, rdv) {
   if (saveBtn)
     saveBtn.onclick = async () => {
       const targetAgendaId = getSelectedAgendaId() || getDefaultAgendaId();
-      if (!targetAgendaId) return showNotif("Sélectionnez un agenda", "err");
+      if (!targetAgendaId) return showPopupNotif("Sélectionnez un agenda", "err");
 
       const newTitre = titre?.value?.trim() || "";
       const newDesc = desc?.value?.trim() || "";
       const recurrence = recur?.value || "none";
-      if (!newTitre) return showNotif("Titre requis", "err");
+      if (!newTitre) return showPopupNotif("Titre requis", "err");
 
       const startInput = document.getElementById("startTime")?.value;
       const endInput = document.getElementById("endTime")?.value;
@@ -278,7 +277,7 @@ function ouvrirEditionRdv(agenda, rdv) {
         });
         if (!res.ok) {
           const err = await res.text();
-          showNotif("Erreur modification RDV: " + err, "err");
+          showPopupNotif("Erreur modification RDV: " + err, "err");
           return;
         }
         if (modal) modal.classList.add("hidden");
@@ -286,11 +285,11 @@ function ouvrirEditionRdv(agenda, rdv) {
         if (desc) desc.value = "";
         rdvEnEdition = null;
         showTimeError("");
-        showNotif("RDV modifié", "ok");
+        showPopupNotif("RDV modifié", "ok");
         await chargerAgendas();
       } catch (err) {
         console.error(err);
-        showNotif("Erreur modification RDV", "err");
+        showPopupNotif("Erreur modification RDV", "err");
       }
     };
 
@@ -323,7 +322,7 @@ function ouvrirEditionRdv(agenda, rdv) {
         });
         if (!res.ok) {
           const err = await res.text();
-          showNotif("Erreur suppression RDV: " + err, "err");
+          showPopupNotif("Erreur suppression RDV: " + err, "err");
           return;
         }
         if (modal) modal.classList.add("hidden");
@@ -331,15 +330,17 @@ function ouvrirEditionRdv(agenda, rdv) {
         if (desc) desc.value = "";
         rdvEnEdition = null;
         showTimeError("");
-        showNotif("RDV supprimé", "ok");
+        showPopupNotif("RDV supprimé", "ok");
         await chargerAgendas();
       } catch (err) {
         console.error(err);
-        showNotif("Erreur suppression RDV", "err");
+        showPopupNotif("Erreur suppression RDV", "err");
       }
     };
   }
 }
+
+
 
 // remettre l'action par défaut du modal (nouveau RDV)
 function setDefaultSaveAction() {
@@ -352,7 +353,7 @@ function setDefaultSaveAction() {
   if (saveBtn)
     saveBtn.onclick = async () => {
       const targetAgendaId = getSelectedAgendaId() || getDefaultAgendaId();
-      if (!targetAgendaId) return showNotif("Sélectionnez un agenda", "err");
+      if (!targetAgendaId) return showPopupNotif("Sélectionnez un agenda", "err");
 
       const titre = document.getElementById("titre").value.trim();
       const description = document.getElementById("desc").value.trim();
@@ -367,7 +368,7 @@ function setDefaultSaveAction() {
       if (!baseDate) baseDate = new Date();
 
       if (!titre || !startInput || !endInput)
-        return showNotif("Titre et heure requis", "err");
+        return showPopupNotif("Titre et heure requis", "err");
       if (!validateTimeRange(startInput, endInput)) return;
 
       const [sh, sm] = startInput.split(":").map(Number);
@@ -393,7 +394,7 @@ function setDefaultSaveAction() {
         });
         if (!res.ok) {
           const err = await res.text();
-          showNotif("Erreur ajout RDV: " + err, "err");
+          showPopupNotif("Erreur ajout RDV: " + err, "err");
           return;
         }
         const titreEl = document.getElementById("titre");
@@ -403,11 +404,11 @@ function setDefaultSaveAction() {
         const modal = document.getElementById("modal");
         if (modal) modal.classList.add("hidden");
         showTimeError("");
-        showNotif("RDV ajouté", "ok");
+        showPopupNotif("RDV ajouté", "ok");
         await chargerAgendas();
       } catch (err) {
         console.error(err);
-        showNotif("Erreur ajout RDV", "err");
+        showPopupNotif("Erreur ajout RDV", "err");
       }
     };
 }

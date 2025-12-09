@@ -17,30 +17,66 @@ let visibleAgendas = {}; // map agendaId -> bool visible
 let currentWeekStart = getMonday(new Date());
 window.currentAgendaId = null; // agenda utilisé pour import/export
 
-// notifications rapides (compatible avec usages existants)
-function showNotif(text, type = "info", ms = 2200) {
-  const n = document.getElementById("notif");
-  if (!n) return console.log(text);
-  n.textContent = text;
-  n.className = ""; // reset
-  n.classList.add(
-    "fixed",
-    "top-4",
-    "left-1/2",
-    "-translate-x-1/2",
-    "px-4",
-    "py-2",
-    "rounded",
-    "shadow",
-    "text-white",
-    "text-sm"
-  );
-  if (type === "ok") n.style.background = "#10b981";
-  else if (type === "err" || type === "error") n.style.background = "#ef4444";
-  else n.style.background = "#3b82f6";
-  n.classList.remove("hidden");
-  setTimeout(() => n.classList.add("hidden"), ms);
+
+function showPopupNotif(text, type = "info", ms = 1000) {
+  const modal = document.getElementById("notifModal");
+  const card = document.getElementById("notifCard");
+  const txt = document.getElementById("notifText");
+  if (!modal || !card || !txt) return;
+
+  // Couleur selon le type
+  if (type === "ok") card.style.background = "#ec4899"; // rose
+  else if (type === "err" || type === "error") card.style.background = "#ef4444"; // rouge
+  else card.style.background = "#facc15"; // jaune
+
+  txt.textContent = text;
+
+  // Affiche le modal
+  modal.classList.remove("hidden");
+  modal.style.opacity = "1";
+
+  // Auto fermeture
+  setTimeout(() => {
+    modal.style.opacity = "0";
+    setTimeout(() => modal.classList.add("hidden"), 300);
+  }, ms);
 }
+
+
+// notifications rapides (compatible avec usages existants)
+window.showNotif = function (text, type = "info", ms = 2200) {
+  const container = document.getElementById("notif");
+  if (!container) return console.log(text);
+
+  const notif = document.createElement("div");
+  notif.className = `
+    px-4 py-2 rounded shadow text-white text-sm 
+    transition-opacity duration-300
+  `;
+
+  // Couleur selon le type
+  if (type === "ok") notif.style.background = "#22c55e";
+  else if (type === "err" || type === "error") notif.style.background = "#facc15";
+  else notif.style.background = "#3b82f6";
+
+  notif.textContent = text;
+  notif.style.opacity = "0";
+
+  // Ajout dans le container (le tien, #notif)
+  container.appendChild(notif);
+
+  // Fade-in
+  requestAnimationFrame(() => {
+    notif.style.opacity = "1";
+  });
+
+  // Auto fade-out + remove
+  setTimeout(() => {
+    notif.style.opacity = "0";
+    setTimeout(() => notif.remove(), 300);
+  }, ms);
+};
+
 
 // ---- utilitaires date ----
 function getMonday(d) {
@@ -91,7 +127,7 @@ async function chargerAgendas() {
     renderAgendaSemaine();
   } catch (err) {
     console.error(err);
-    showNotif("Impossible de charger les agendas", "err");
+    showPopupNotif("Impossible de charger les agendas", "err");
   }
 }
 
@@ -186,14 +222,14 @@ async function creerAgenda(nom) {
     });
     if (!res.ok) {
       const err = await res.text();
-      showNotif("Erreur création agenda: " + err, "err");
+      showPopupNotif("Erreur création agenda: " + err, "err");
       return;
     }
-    showNotif("Agenda créé", "ok");
+    showPopupNotif("Agenda créé", "ok");
     await chargerAgendas();
   } catch (err) {
     console.error(err);
-    showNotif("Erreur création agenda", "err");
+    showPopupNotif("Erreur création agenda", "err");
   } finally {
     creerAgenda._inFlight = false;
     if (sidebarBtn) sidebarBtn.disabled = false;
@@ -214,14 +250,14 @@ async function renommerAgendaPrompt(agenda) {
     });
     if (!res.ok) {
       const err = await res.text();
-      showNotif("Erreur renommage: " + err, "err");
+      showPopupNotif("Erreur renommage: " + err, "err");
       return;
     }
-    showNotif("Agenda renommé", "ok");
+    showPopupNotif("Agenda renommé", "ok");
     await chargerAgendas();
   } catch (err) {
     console.error(err);
-    showNotif("Erreur renommage", "err");
+    showPopupNotif("Erreur renommage", "err");
   }
 }
 
@@ -238,14 +274,14 @@ async function supprimerAgendaConfirm(agenda) {
     });
     if (!res.ok) {
       const err = await res.text();
-      showNotif("Erreur suppression: " + err, "err");
+      showPopupNotif("Erreur suppression: " + err, "err");
       return;
     }
-    showNotif("Agenda supprimé", "ok");
+    showPopupNotif("Agenda supprimé", "ok");
     await chargerAgendas();
   } catch (err) {
     console.error(err);
-    showNotif("Erreur suppression", "err");
+    showPopupNotif("Erreur suppression", "err");
   }
 }
 
@@ -272,7 +308,7 @@ document.getElementById("todayWeek")?.addEventListener("click", () => {
 // actions boutons statiques (ajout agenda, ajout rdv, logout)
 document.getElementById("btnAddAgenda")?.addEventListener("click", async () => {
   const nom = document.getElementById("agendaNom").value.trim();
-  if (!nom) return showNotif("Nom obligatoire", "err");
+  if (!nom) return showPopupNotif("Nom obligatoire", "err");
   await creerAgenda(nom);
 });
 
@@ -315,7 +351,7 @@ function initUIHandlers() {
       if (input && input.value.trim()) data.username = input.value.trim();
       if (pass && pass.value.trim()) data.password = pass.value.trim();
       if (Object.keys(data).length === 0)
-        return showNotif("Rien à changer", "err");
+        return showPopupNotif("Rien à changer", "err");
       try {
         const res = await fetch("/api/auth/update", {
           method: "POST",
@@ -325,17 +361,17 @@ function initUIHandlers() {
         });
         if (!res.ok) {
           const txt = await res.text();
-          return showNotif("Erreur mise à jour: " + txt, "err");
+          return showPopupNotif("Erreur mise à jour: " + txt, "err");
         }
         if (data.username) {
           localStorage.setItem("username", data.username);
           if (accountNameEl) accountNameEl.textContent = data.username;
         }
         accountModal.classList.add("hidden");
-        showNotif("Compte mis à jour", "ok");
+        showPopupNotif("Compte mis à jour", "ok");
       } catch (err) {
         console.error(err);
-        showNotif("Erreur mise à jour", "err");
+        showPopupNotif("Erreur mise à jour", "err");
       }
     });
   }
@@ -396,7 +432,7 @@ function initUIHandlers() {
       const input = document.getElementById("sidebarAgendaName");
       if (!input) return;
       const nom = input.value.trim();
-      if (!nom) return showNotif("Nom obligatoire", "err");
+      if (!nom) return showPopupNotif("Nom obligatoire", "err");
       await creerAgenda(nom);
       input.value = "";
     });
@@ -441,7 +477,7 @@ setTimeout(() => {
 window.addEventListener("error", (e) => {
   console.error("[agenda] uncaught error", e.error || e.message, e);
   try {
-    showNotif(
+    showPopupNotif(
       "Erreur JS: " + (e.error?.message || e.message || "inconnu"),
       "err"
     );

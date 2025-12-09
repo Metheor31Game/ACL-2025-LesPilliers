@@ -88,10 +88,10 @@ document.addEventListener("DOMContentLoaded", () => {
           credentials: "include",
         });
         if (res.ok) {
-          alert("Agenda importé !");
+          showPopupNotif("Agenda importé !", "ok");
           if (window.chargerAgendas) window.chargerAgendas();
         } else {
-          alert("Erreur lors de l'import");
+          showPopupNotif("Erreur lors de l'import", "err");
         }
       });
       importInput.dataset._attached = "1";

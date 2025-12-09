@@ -11,28 +11,38 @@ window.colors = [
 ];
 
 window.showNotif = function (text, type = "info", ms = 2200) {
-  const n = document.getElementById("notif");
-  if (!n) return console.log(text);
-  n.textContent = text;
-  n.className = ""; // reset
-  n.classList.add(
-    "fixed",
-    "top-4",
-    "left-1/2",
-    "-translate-x-1/2",
-    "px-4",
-    "py-2",
-    "rounded",
-    "shadow",
-    "text-white",
-    "text-sm"
-  );
-  if (type === "ok") n.style.background = "#10b981";
-  else if (type === "err" || type === "error") n.style.background = "#ef4444";
-  else n.style.background = "#3b82f6";
-  n.classList.remove("hidden");
-  setTimeout(() => n.classList.add("hidden"), ms);
+  const container = document.getElementById("notif");
+  if (!container) return console.log(text);
+
+  const notif = document.createElement("div");
+  notif.className = `
+    px-4 py-2 rounded shadow text-white text-sm 
+    transition-opacity duration-300
+  `;
+
+  // Couleur selon le type
+  if (type === "ok") notif.style.background = "#ec4899";
+  else if (type === "err" || type === "error") notif.style.background = "#facc15";
+  else notif.style.background = "#3b82f6";
+
+  notif.textContent = text;
+  notif.style.opacity = "0";
+
+  // Ajout dans le container (le tien, #notif)
+  container.appendChild(notif);
+
+  // Fade-in
+  requestAnimationFrame(() => {
+    notif.style.opacity = "1";
+  });
+
+  // Auto fade-out + remove
+  setTimeout(() => {
+    notif.style.opacity = "0";
+    setTimeout(() => notif.remove(), 300);
+  }, ms);
 };
+
 
 window.getMonday = function (d) {
   d = new Date(d);
