@@ -378,3 +378,10 @@ body {
   background-color: #7c3aed; /* violet */
 }
 
+#sidebarAgendaList .w-5.h-5 {
+  min-width: 10px !important;
+  width: 10px !important;
+  height: 10px !important;
+  display: inline-block !important;
+}
+

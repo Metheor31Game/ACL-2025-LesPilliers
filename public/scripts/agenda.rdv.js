@@ -84,7 +84,7 @@ function renderAgendaSemaine() {
 
       agendas.forEach((agenda, idx) => {
         if (!visibleAgendas[agenda._id]) return;
-        const color = colors[idx % colors.length];
+        const color = agenda.color || colors[idx % colors.length];
 
         (agenda.rdvs || []).forEach((r) => {
           const rdvDate = new Date(r.date || r.startTime);

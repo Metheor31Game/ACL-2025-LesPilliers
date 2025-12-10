@@ -38,8 +38,12 @@ router.post("/", isAuthenticated, async (req, res) => {
 
 // rename an agenda
 router.patch("/:agendaId", isAuthenticated, async (req, res) => {
-  const { nom } = req.body;
+  const { nom, color } = req.body;
   try {
+    const updates = {};
+    if (nom !== undefined) updates.nom = nom;
+    if (color !== undefined) updates.color = color;
+
     const agenda = await Agenda.findOneAndUpdate(
       { _id: req.params.agendaId, userId: req.session.userId },
       { $set: { nom } },

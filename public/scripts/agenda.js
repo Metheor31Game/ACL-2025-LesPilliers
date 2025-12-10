@@ -108,17 +108,20 @@ function populateSelect() {
   });
 }
 
-// légende (couleurs, toggle visibilité, edit, delete)
+
 function afficherLegende() {
-  const leg =
-    document.getElementById("sidebarAgendaList") ||
-    document.getElementById("legende");
+  const leg = document.getElementById("sidebarAgendaList");
   if (!leg) return;
   leg.innerHTML = "";
+
   agendas.forEach((a, i) => {
-    const color = colors[i % colors.length];
+    const agendaColor = a.color || colors[i % colors.length];
+
     const wrapper = document.createElement("div");
-    wrapper.className = "flex items-center gap-2";
+    wrapper.className = "flex items-center justify-between py-1";
+
+    const leftPart = document.createElement("div");
+    leftPart.className = "flex items-center gap-2 flex-1";
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
@@ -126,43 +129,65 @@ function afficherLegende() {
     checkbox.onchange = () => {
       visibleAgendas[a._id] = checkbox.checked;
       renderAgendaSemaine();
-      const pickerCb = document.querySelector(
-        `#agendaPickerList input[value='${a._id}']`
-      );
-      if (pickerCb) pickerCb.checked = checkbox.checked;
     };
 
-    const swatch = document.createElement("span");
-    swatch.style.background = color;
-    swatch.className = "w-4 h-4 rounded-full inline-block";
+    const colorSwatch = document.createElement("span");
+    colorSwatch.style.backgroundColor = agendaColor;
+    colorSwatch.className = "w-5 h-5 rounded border border-gray-300 cursor-pointer shrink-0";
+    colorSwatch.title = "Changer la couleur de cet agenda";
+    colorSwatch.onclick = (e) => {
+      e.stopPropagation();
+      const picker = document.createElement("input");
+      picker.type = "color";
+      picker.value = agendaColor;
+      picker.onchange = async () => {
+        try {
+          const res = await fetch(`/api/agenda/${a._id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ color: picker.value })
+          });
+          if (res.ok) {
+            a.color = picker.value;
+            afficherLegende();
+            renderAgendaSemaine();
+            showNotif("Couleur modifiée ✓", "ok");
+          } else {
+            showNotif("Erreur couleur", "err");
+          }
+        } catch (err) {
+          showNotif("Erreur réseau", "err");
+        }
+      };
+      picker.click();
+    };
 
     const label = document.createElement("span");
-    label.className = "font-medium ml-1 mr-2";
     label.textContent = a.nom;
+    label.className = "font-medium truncate";
+    label.onclick = () => window.currentAgendaId = a._id;
+
+    leftPart.append(checkbox, colorSwatch, label);
+
+    const actions = document.createElement("div");
+    actions.className = "flex items-center gap-2";
 
     const editBtn = document.createElement("button");
-    editBtn.className = "text-xs text-blue-600 ml-2";
     editBtn.textContent = "✎";
+    editBtn.className = "text-xs text-blue-600";
     editBtn.title = "Renommer";
     editBtn.onclick = () => renommerAgendaPrompt(a);
 
     const delBtn = document.createElement("button");
-    delBtn.className = "text-xs text-red-600 ml-1";
     delBtn.textContent = "🗑";
+    delBtn.className = "text-xs text-red-600";
     delBtn.title = "Supprimer";
     delBtn.onclick = () => supprimerAgendaConfirm(a);
 
-    wrapper.appendChild(checkbox);
-    wrapper.appendChild(swatch);
-    wrapper.appendChild(label);
-    wrapper.appendChild(editBtn);
-    wrapper.appendChild(delBtn);
+    actions.append(editBtn, delBtn);
 
-    // clicking the label sets currentAgendaId for import/export
-    label.onclick = () => {
-      window.currentAgendaId = a._id;
-    };
-
+    wrapper.append(leftPart, actions);
     leg.appendChild(wrapper);
   });
 }

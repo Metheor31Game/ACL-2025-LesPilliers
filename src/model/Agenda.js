@@ -5,6 +5,10 @@ const agendaSchema = new mongoose.Schema({
   nom: { type: String, required: true },
   rdvs: [rdvSchema],
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+  color: {
+    type: String,
+    default: "#3b82f6"
+  },
 
   sharedWith: {
     type: [
