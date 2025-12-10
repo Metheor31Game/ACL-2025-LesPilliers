@@ -58,6 +58,14 @@ Statut : Réalisé et validé
 
 -Les erreurs liées aux doublons sont évitées.
 
+U12 - Pop up pertinentes
+
+Statut : Réalisé et validé
+
+- L'utilisateur comprend mieux les erreurs.
+
+- le design des erreurs et des alertes à été revu.
+
 U13 – Bouton “Revenir à aujourd’hui”
 
 Statut : Réalisé et validé
@@ -68,12 +76,11 @@ Statut : Réalisé et validé
 
 U9 – Alerte si date fin < date début (validée partiellement)
 
-Statut : Partiel
+Statut : Réalisé et validé
 
 -La création d’un RDV est empêchée si la date de fin est avant la date de début.
 
--Aucune alerte ou message explicatif n’est encore affiché.
-
+-Une alerte s'affiche pour préciser qu'il est impossible de mettre la fin avant le début.
 
 Fonctionnalités non réalisées :
 
@@ -86,10 +93,6 @@ U8 – Génération d’une image de l’écran
 -Non réalisée.
 
 U11 – Modifier la couleur d’un agenda
-
--Non réalisée.
-
-U12 – Pop-ups pertinentes
 
 -Non réalisée.
 
