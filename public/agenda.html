@@ -9,10 +9,8 @@
   </head>
 
   <body class="bg-gray-50 min-h-screen p-6">
-    <div
-      id="notif"
-      class="fixed top-4 left-1/2 transform -translate-x-1/2 hidden px-4 py-2 rounded shadow text-white text-sm"
-    ></div>
+
+    <div id="notif" class="fixed top-4 right-4 flex flex-col gap-2 z-50"></div>
     <div class="max-w-5xl mx-auto bg-white p-6 rounded shadow">
       <!-- Header: title + account area -->
       <header class="agenda-header mb-4">
@@ -208,6 +206,13 @@
         </main>
       </div>
     </div>
+
+
+
+
+
+
+
     <!-- legacy legend and add-agenda moved into the sidebar -->
 
     <!-- (Sélecteur d'agenda retiré — le RDV est créé dans le premier agenda visible) -->
@@ -324,6 +329,15 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal notification -->
+    <div id="notifModal" class="fixed inset-0 notif-modal-overlay hidden z-100">
+      <div id="notifCard" class="notif-modal-card text-center">
+        <p id="notifText" class="font-semibold"></p>
+      </div>
+    </div>
+
+
     <script src="/scripts/agenda.utils.js"></script>
     <script src="/scripts/agenda.api.js"></script>
     <script src="/scripts/agenda.pw.js"></script>

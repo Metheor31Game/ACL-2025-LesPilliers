@@ -45,7 +45,6 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("[agenda.main] picker fallback attached");
     }
 
-
     // logout fallback
     const logoutBtn = document.getElementById("logoutBtn");
     if (logoutBtn && !logoutBtn.dataset._attached) {

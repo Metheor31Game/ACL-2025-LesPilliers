@@ -21,12 +21,12 @@ window.agendaApi = (function () {
         body: JSON.stringify({ nom }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showNotif("Agenda créé", "ok");
+      showPopupNotif("Agenda créé", "ok");
       if (window.chargerAgendas) await window.chargerAgendas();
       return await res.json();
     } catch (err) {
       console.error(err);
-      showNotif("Erreur création agenda", "err");
+      showPopupNotif("Erreur création agenda", "err");
       throw err;
     } finally {
       creerAgenda._inFlight = false;
@@ -42,12 +42,12 @@ window.agendaApi = (function () {
         body: JSON.stringify({ nom: nouveau }),
       });
       if (!res.ok) throw new Error(await res.text());
-      showNotif("Agenda renommé", "ok");
+      showPopupNotif("Agenda renommé", "ok");
       if (window.chargerAgendas) await window.chargerAgendas();
       return await res.json();
     } catch (err) {
       console.error(err);
-      showNotif("Erreur renommage", "err");
+      showPopupNotif("Erreur renommage", "err");
       throw err;
     }
   }
@@ -59,12 +59,12 @@ window.agendaApi = (function () {
         credentials: "include",
       });
       if (!res.ok) throw new Error(await res.text());
-      showNotif("Agenda supprimé", "ok");
+      showPopupNotif("Agenda supprimé", "ok");
       if (window.chargerAgendas) await window.chargerAgendas();
       return true;
     } catch (err) {
       console.error(err);
-      showNotif("Erreur suppression", "err");
+      showPopupNotif("Erreur suppression", "err");
       throw err;
     }
   }
@@ -138,7 +138,7 @@ window.agendaApi = (function () {
       const accountNameEl = document.getElementById("accountName");
       if (accountNameEl) accountNameEl.textContent = data.username;
     }
-    showNotif("Compte mis à jour", "ok");
+    showPopupNotif("Compte mis à jour", "ok");
     return true;
   }
 
